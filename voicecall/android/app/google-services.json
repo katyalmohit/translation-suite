@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "446886650399",
+    "project_id": "calling-app-30df7",
+    "storage_bucket": "calling-app-30df7.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:446886650399:android:90c359e4e91aa19e942b2a",
+        "android_client_info": {
+          "package_name": "com.example.voicecall"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "446886650399-v55d90m24mpalqh8pp99fhdp1f1uq3cl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.voicecall",
+            "certificate_hash": "23c7297b230bada0d06d10cf9ec332bc1ea05acf"
+          }
+        },
+        {
+          "client_id": "446886650399-m56hf8mak3j8fr4umuad5mgpl25pvm4v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDM7rFTmNDqD6Jn_wiQT9vwtWm_aSDnrWo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "446886650399-m56hf8mak3j8fr4umuad5mgpl25pvm4v.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "446886650399-82ls2qfmrd1vb61fb286vtguhvp9c7ju.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.voicecall"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
