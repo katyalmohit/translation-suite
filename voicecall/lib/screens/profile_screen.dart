@@ -1,20 +1,126 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:voicecall/firebase/wrapper.dart';
 import 'package:voicecall/screens/edit_profile_screen.dart';
-import 'package:voicecall/widgets/back_app_bar.dart';
-import 'package:voicecall/widgets/custom_app_bar.dart'; // Import your custom app bar
+import '../widgets/back_app_bar.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  User? user = FirebaseAuth.instance.currentUser;
+  Map<String, dynamic>? userData;
+  File? _image;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserData();
+  }
+
+  Future<void> _fetchUserData() async {
+    try {
+      DocumentSnapshot snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user?.uid)
+          .get();
+      if (snapshot.exists) {
+        setState(() {
+          userData = snapshot.data() as Map<String, dynamic>;
+        });
+      }
+    } catch (e) {
+      print("Failed to fetch user data: $e");
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _image = File(pickedFile.path);
+      });
+      await _uploadImage();
+    }
+  }
+
+  Future<void> _uploadImage() async {
+  if (_image == null) {
+    print("No image selected.");
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please select an image first.')),
+    );
+    return;
+  }
+
+  try {
+    final ref = FirebaseStorage.instance
+        .ref()
+        .child('profile_images')
+        .child('${user?.uid}.jpg');
+
+    print("Uploading image to Firebase Storage...");
+
+    // Start the upload and wait for completion
+    UploadTask uploadTask = ref.putFile(_image!);
+
+    // Listen for upload task state changes
+    uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+      print('Upload state: ${snapshot.state}'); // Prints upload state
+      print('Transferred: ${snapshot.bytesTransferred} bytes');
+    });
+
+    // Wait for the task to complete
+    await uploadTask;
+
+    print("Image uploaded successfully.");
+
+    // Get the download URL
+    String downloadURL = await ref.getDownloadURL();
+    print("Download URL: $downloadURL");
+
+    // Save the download URL to Firestore
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user?.uid)
+        .update({
+      'profileImage': downloadURL,
+    });
+
+    print("Profile image URL saved to Firestore.");
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Profile picture updated!')),
+    );
+  } catch (e) {
+    print("Error during upload: $e");
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Upload failed: $e')),
+    );
+  }
+}
+
+
+
+  @override
   Widget build(BuildContext context) {
+    if (userData == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: BackAppBar(
-        title: "My Profile", // Set the title for the app bar
-        onMorePressed: () {
-          // Handle more options if needed
-        },
+        title: "My Profile",
+        onMorePressed: () {},
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -28,14 +134,9 @@ class ProfileScreen extends StatelessWidget {
                 CircleAvatar(
                   radius: 70,
                   backgroundColor: Colors.grey[300],
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/icon.jpg', // Replace with your profile picture asset
-                      width: 140,
-                      height: 140,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+                  backgroundImage: userData!['profileImage'] != null
+                      ? NetworkImage(userData!['profileImage'])
+                      : const AssetImage('assets/icon.jpg') as ImageProvider,
                 ),
                 Positioned(
                   bottom: 0,
@@ -47,9 +148,7 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.add, color: Colors.white),
-                      onPressed: () {
-                        // Handle image upload
-                      },
+                      onPressed: _pickImage, // Handle image upload
                     ),
                   ),
                 ),
@@ -58,45 +157,60 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // User details
-            const Text(
-              "ROHAN KUMAR",
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black),
+            Text(
+              userData!['fullName'] ?? 'N/A',
+              style: const TextStyle(
+                  fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black),
             ),
             const SizedBox(height: 8),
-            const Text(
-              "+91 9989756748",
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+            Text(
+              userData!['phoneNumber'] ?? 'N/A',
+              style: const TextStyle(fontSize:18, color: Colors.grey),
             ),
             const SizedBox(height: 20),
 
             // Location, Email, Birthday
-            _buildDetailRow("LOCATION :", "DELHI"),
-            _buildDetailRow("EMAIL :", "ROHANK@GMAIL.COM"),
-            _buildDetailRow("BIRTHDAY :", "01/01/2004"),
+            _buildDetailRow("LOCATION :", userData!['location'] ?? 'N/A'),
+            _buildDetailRow("EMAIL :", userData!['email'] ?? 'N/A'),
+            _buildDetailRow("BIRTHDAY :", userData!['birthday'] ?? 'N/A'),
 
             const SizedBox(height: 30),
 
-            // Edit button
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const EditProfileScreen()), // Use the actual HomeScreen widget
-                  );
-                // Handle edit action
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color.fromARGB(191, 246, 21, 5), // Background color for the edit button
-                padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
+            // Edit and Logout buttons side by side
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const EditProfileScreen()),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color.fromARGB(191, 246, 21, 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    textStyle: const TextStyle(fontSize: 18),
+                  ),
+                  child: const Text("EDIT"),
                 ),
-                textStyle: const TextStyle(fontSize: 18), // Font size for the button text
-              ),
-
-              child: const Text("EDIT"),
-              
-
+                ElevatedButton(
+                  onPressed: () => _logout(context), // Logout function call
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    textStyle: const TextStyle(fontSize: 18),
+                  ),
+                  child: const Text("LOGOUT"),
+                ),
+              ],
             ),
           ],
         ),
@@ -104,6 +218,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  // Widget to display user details in a row
   Widget _buildDetailRow(String title, String value) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -120,5 +235,24 @@ class ProfileScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // Logout function
+  void _logout(BuildContext context) async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const Wrapper()),
+        (route) => false,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Logged out successfully.')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Logout failed: ${e.toString()}')),
+      );
+    }
   }
 }

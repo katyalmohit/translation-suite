@@ -1,75 +1,51 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/user.dart' as UserModel;
+import 'package:voicecall/models/user.dart' as AppUserModel; // Alias to avoid conflict
 
 class AuthMethods {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Sign up user
-  Future<String> signUpUser({
-    required String fullName,
-    required String email,
-    required String password,
-    required String phoneNumber,
-    required String birthday,
-    required String location,
-  }) async {
-    String result = "Some error occurred";
+  // Sign Up Method
+  Future<String?> signUp(
+      String email, String password, AppUserModel.User user) async {
     try {
-      if (email.isNotEmpty &&
-          password.isNotEmpty &&
-          fullName.isNotEmpty &&
-          phoneNumber.isNotEmpty &&
-          birthday.isNotEmpty &&
-          location.isNotEmpty) {
-        // Create user in Firebase Auth
-        UserCredential cred = await _auth.createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
+      UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-        // Add user to Firestore
-        UserModel.User user = UserModel.User(
-          uid: cred.user!.uid,
-          email: email,
-          fullName: fullName,
-          phoneNumber: phoneNumber,
-          birthday: birthday,
-          location: location,
-        );
-        await _firestore.collection('users').doc(cred.user!.uid).set(user.toJson());
-
-        result = "success";
-      } else {
-        result = "Please fill all the fields";
+      // Send email verification
+      if (userCredential.user != null && !userCredential.user!.emailVerified) {
+        await userCredential.user!.sendEmailVerification();
       }
+
+      return null; // If no errors, return null (success)
     } on FirebaseAuthException catch (e) {
-      result = e.message ?? "An error occurred";
+      return e.message; // Return Firebase error message
     } catch (e) {
-      result = e.toString();
+      return "An unknown error occurred.";
     }
-    return result;
   }
 
-  // Login user
-  Future<String?> loginUser(String email, String password) async {
-    String? result;
+  // Login Method
+  Future<String?> login(String email, String password) async {
     try {
-      if (email.isNotEmpty && password.isNotEmpty) {
-        await _auth.signInWithEmailAndPassword(email: email, password: password);
-        result = null; // Success
-      } else {
-        result = "Please enter all fields";
-      }
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      return null; // Successful login
     } on FirebaseAuthException catch (e) {
-      result = e.message;
+      return e.message; // Return Firebase error message
+    } catch (e) {
+      return "An unknown error occurred.";
     }
-    return result;
   }
 
-  // Sign out
-  Future<void> signOutUser() async {
+  // Logout Method
+  Future<void> logout() async {
     await _auth.signOut();
+  }
+
+  // Get Current User
+  User? getCurrentUser() {
+    return _auth.currentUser;
   }
 }

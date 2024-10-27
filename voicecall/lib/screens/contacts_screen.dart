@@ -1,8 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart'; // For making phone calls
+import 'package:voicecall/screens/contact_profile_screen.dart';
 import 'package:voicecall/screens/profile_screen.dart';
 import 'package:voicecall/translations/translation_screen.dart';
-import 'package:voicecall/widgets/bottom_navigation.dart';
-import 'package:voicecall/widgets/custom_app_bar.dart';
+import '../layout/mobile_layout.dart';
+import '../widgets/custom_app_bar.dart';
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({super.key});
@@ -12,36 +16,51 @@ class ContactsScreen extends StatefulWidget {
 }
 
 class _ContactsScreenState extends State<ContactsScreen> {
-  // Dummy list of contacts
-  final List<Map<String, String>> contacts = [
-    {
-      'name': 'Mr. Rohan Kumar',
-      'number': '+99897 565 71 73',
-    },
-    {
-      'name': 'Mr. Amit Sharma',
-      'number': '+99897 565 71 73',
-    },
-    {
-      'name': 'Mr. Anshul Goyal',
-      'number': '+99897 565 71 73',
-    },
-    {
-      'name': 'Mr. Rohan Kumar',
-      'number': '+99897 565 71 73',
-    },
-    {
-      'name': 'Mr. Amit Sharma',
-      'number': '+99897 565 71 73',
-    },
-    {
-      'name': 'Mr. Anshul Goyal',
-      'number': '+99897 565 71 73',
-    },
-    // Add more contacts as needed
-  ];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  bool _isDeleteMode = false;
+  bool _selectAll = false;
   String _searchQuery = '';
+  List<Map<String, dynamic>> _contacts = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchContacts();
+  }
+
+  Future<void> _fetchContacts() async {
+    try {
+      String userId = _auth.currentUser?.uid ?? '';
+
+      QuerySnapshot snapshot = await _firestore
+          .collection('contacts')
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      List<Map<String, dynamic>> fetchedContacts = snapshot.docs.map((doc) {
+        return {
+          'id': doc.id,
+          'name': doc['name'] ?? '',
+          'phone': doc['phone'] ?? '',
+          'email': doc['email'] ?? '',
+          'location': doc['location'] ?? '',
+          'imageUrl': doc['imageUrl'] ?? '',
+          'isSelected': false,
+        };
+      }).toList();
+
+      setState(() {
+        _contacts = fetchedContacts;
+      });
+    } catch (e) {
+      print('Error fetching contacts: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to load contacts')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,138 +68,205 @@ class _ContactsScreenState extends State<ContactsScreen> {
       child: Scaffold(
         appBar: CustomAppBar(
           title: "Contacts",
-          onMorePressed: () {
-            _showPopupMenu(context); // Show three-dot menu
-          },
+          onMorePressed: () => _showPopupMenu(context),
         ),
         body: Column(
           children: [
-            const SizedBox(height: 10), // Spacing between Contacts and Search bar
-
-            // Search Bar
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: TextField(
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: const Color.fromARGB(255, 240, 230, 240),
-                  prefixIcon: const Icon(Icons.search, color: Colors.grey), // Left search icon
-                  hintText: "Search Contacts",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20.0),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
-              ),
-            ),
-
-            // Contacts List
-            Expanded(
-              child: ListView.builder(
-                itemCount: contacts.length,
-                itemBuilder: (context, index) {
-                  String name = contacts[index]['name'] ?? '';
-                  String number = contacts[index]['number'] ?? '';
-
-                  // Filter contacts based on search query
-                  if (_searchQuery.isNotEmpty &&
-                      !name.toLowerCase().contains(_searchQuery.toLowerCase())) {
-                    return Container();
-                  }
-
-                  return ListTile(
-                    leading: const CircleAvatar(
-                      radius: 25,
-                      backgroundImage: AssetImage('assets/icon.jpg'), // Using icon.png as the avatar
-                    ),
-                    title: Text(name),
-                    subtitle: Text(number),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.call, color: Colors.green),
-                      onPressed: () {
-                        // Handle call action
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
+            const SizedBox(height: 10),
+            _buildSearchBar(),
+            if (_isDeleteMode) _buildSelectAllCheckbox(),
+            _buildContactsList(),
           ],
         ),
-        bottomNavigationBar: BottomNavigationWidget(
-          currentIndex: 2, // Set 'Contacts' as the current tab
-          onTap: _onBottomNavTap,
-        ),
+        floatingActionButton: _isDeleteMode
+            ? FloatingActionButton(
+                onPressed: _deleteSelectedContacts,
+                backgroundColor: Colors.red,
+                child: const Icon(Icons.delete, color: Colors.white),
+              )
+            : null,
       ),
     );
   }
 
-  // Handle bottom navigation tap
-  void _onBottomNavTap(int index) {
-    switch (index) {
-      case 0:
-        // Navigate to Keypad screen
-        Navigator.pushReplacementNamed(context, '/keypad');
-        break;
-      case 1:
-        // Navigate to Recent screen
-        Navigator.pushReplacementNamed(context, '/recents');
-        break;
-      case 2:
-        // Current screen is Contacts, no need to navigate
-        break;
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: TextField(
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: const Color.fromARGB(255, 240, 230, 240),
+          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+          hintText: "Search Contacts",
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(20.0),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        onChanged: (value) {
+          setState(() {
+            _searchQuery = value;
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildSelectAllCheckbox() {
+    return Row(
+      children: [
+        Checkbox(
+          value: _selectAll,
+          onChanged: (value) {
+            setState(() {
+              _selectAll = value ?? false;
+              for (var contact in _contacts) {
+                contact['isSelected'] = _selectAll;
+              }
+            });
+          },
+        ),
+        const Text('Select All'),
+      ],
+    );
+  }
+
+Widget _buildContactsList() {
+  return Expanded(
+    child: ListView.builder(
+      itemCount: _contacts.length,
+      itemBuilder: (context, index) {
+        String name = _contacts[index]['name'] ?? '';
+        String phone = _contacts[index]['phone'] ?? '';
+        String imageUrl = _contacts[index]['imageUrl'] ?? '';
+        bool isSelected = _contacts[index]['isSelected'] ?? false;
+
+        if (_searchQuery.isNotEmpty &&
+            !name.toLowerCase().contains(_searchQuery.toLowerCase())) {
+          return Container(); // Filter results based on search query
+        }
+
+        return ListTile(
+          leading: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_isDeleteMode) // Show checkbox in delete mode
+                Checkbox(
+                  value: isSelected,
+                  onChanged: (value) {
+                    setState(() {
+                      _contacts[index]['isSelected'] = value ?? false;
+                      _selectAll = _contacts.every((contact) => contact['isSelected']);
+                    });
+                  },
+                ),
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ContactProfileScreen(
+                        contact: _contacts[index],
+                      ),
+                    ),
+                  );
+                },
+                child: CircleAvatar(
+                  radius: 25,
+                  backgroundImage: imageUrl.isNotEmpty
+                      ? NetworkImage(imageUrl)
+                      : const AssetImage('assets/icon.jpg') as ImageProvider,
+                ),
+              ),
+            ],
+          ),
+          title: Text(name),
+          subtitle: Text(phone),
+          trailing: IconButton(
+            icon: const Icon(Icons.call, color: Colors.green),
+            onPressed: () => _makePhoneCall(phone),
+          ),
+        );
+      },
+    ),
+  );
+}
+
+
+
+
+
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+  final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+
+  try {
+    if (await canLaunchUrl(phoneUri)) {
+      await launchUrl(phoneUri);
+    } else {
+      throw 'Could not launch $phoneNumber';
+    }
+  } catch (e) {
+    print('Error launching phone call: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not make the call')),
+    );
+  }
+}
+
+  Future<void> _deleteSelectedContacts() async {
+    try {
+      for (var contact in _contacts.where((c) => c['isSelected'])) {
+        await _firestore.collection('contacts').doc(contact['id']).delete();
+      }
+
+      setState(() {
+        _contacts.removeWhere((contact) => contact['isSelected']);
+        _isDeleteMode = false;
+        _selectAll = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selected contacts deleted')),
+      );
+    } catch (e) {
+      print('Error deleting contacts: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to delete contacts')),
+      );
     }
   }
 
-  // Show the popup menu with options (Profile, Translations)
   void _showPopupMenu(BuildContext context) async {
-    final RenderBox overlay = Overlay.of(context)!.context.findRenderObject() as RenderBox;
-
     await showMenu(
       color: const Color.fromARGB(255, 39, 196, 159),
       context: context,
-      position: RelativeRect.fromRect(
-        Rect.fromLTWH(
-          overlay.size.width - 40, // Adjusted position for proper alignment
-          80, // Position the menu just below the three-dot icon
-          100,
-          100,
-        ),
-        Offset.zero & overlay.size,
-      ),
+      position: const RelativeRect.fromLTRB(300, 80, 0, 0),
       items: [
+        const PopupMenuItem<String>(value: 'delete', child: Text('Delete')),
+        const PopupMenuItem<String>(value: 'profile', child: Text('Profile')),
         const PopupMenuItem<String>(
-          value: 'profile',
-          child: Text('Profile'),
-        ),
-        const PopupMenuItem<String>(
-          value: 'translations',
-          child: Text('Translations'),
-        ),
+            value: 'translations', child: Text('Translations')),
       ],
       elevation: 8.0,
     ).then((value) {
-      // Handle menu option selection
       switch (value) {
+        case 'delete':
+          setState(() {
+            _isDeleteMode = true;
+          });
+          break;
         case 'profile':
-          // Handle profile action
-        Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const ProfileScreen()), // Use the actual HomeScreen widget
-                  );
-             break;
-        case 'translations':
-          // Handle translations action
-          print('Translations selected');
           Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const TranslationsScreen()), // Use the actual HomeScreen widget
-                  ); 
+            context,
+            MaterialPageRoute(builder: (context) => const ProfileScreen()),
+          );
+          break;
+        case 'translations':
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const TranslationsScreen()),
+          );
           break;
       }
     });

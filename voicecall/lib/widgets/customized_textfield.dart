@@ -5,6 +5,7 @@ class CustomizedTextfield extends StatefulWidget {
   final String? hintText;
   final bool isPassword;
   final TextInputType keyboardType;
+  final Widget? suffix; // Optional suffix widget
 
   const CustomizedTextfield({
     Key? key,
@@ -12,6 +13,7 @@ class CustomizedTextfield extends StatefulWidget {
     this.hintText,
     this.isPassword = false,
     this.keyboardType = TextInputType.text,
+    this.suffix, // New parameter for suffix widget
   }) : super(key: key);
 
   @override
@@ -48,7 +50,7 @@ class _CustomizedTextfieldState extends State<CustomizedTextfield> {
                     });
                   },
                 )
-              : null,
+              : widget.suffix, // Use the provided suffix widget if available
           enabledBorder: OutlineInputBorder(
             borderSide: const BorderSide(color: Color(0xffE8ECF4), width: 1),
             borderRadius: BorderRadius.circular(10),
