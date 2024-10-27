@@ -1,44 +1,42 @@
-import 'package:flutter/material.dart';
+// import 'package:flutter/material.dart';
 
-class BottomNavigationWidget extends StatelessWidget {
-  final int currentIndex;
-  final Function(int) onTap;
+// class BottomNavigationWidget extends StatelessWidget {
+//   final int currentIndex;
+//   final ValueChanged<int> onTap; // Use ValueChanged for clarity
 
-  const BottomNavigationWidget({
-    Key? key,
-    required this.currentIndex,
-    required this.onTap,
-  }) : super(key: key);
+//   const BottomNavigationWidget({
+//     Key? key,
+//     required this.currentIndex,
+//     required this.onTap,
+//   }) : super(key: key);
 
-  @override
-  Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.dialpad),
-          label: 'Keypad',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.history),
-          label: 'Recents',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.contacts),
-          label: 'Contacts',
-        ),
-      ],
-      currentIndex: currentIndex, // Dynamically set the current index
-      selectedItemColor: Colors.blue, // Active tab color
-      unselectedItemColor: Colors.grey, // Inactive tab color
-      backgroundColor: Colors.white, // Background color of BottomNavigationBar
-      type: BottomNavigationBarType.fixed, // Prevent shifting of icons
-      showSelectedLabels: true, // Show label for active tab
-      showUnselectedLabels: true, // Show label for inactive tabs
-      elevation: 8.0, // Add shadow to the bar
-      onTap: (index) {
-        // Call the onTap function passed from parent widget
-        onTap(index);
-      },
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return BottomNavigationBar(
+//       items: const [
+//         BottomNavigationBarItem(
+//           icon: Icon(Icons.dialpad),
+//           label: 'Keypad',
+//         ),
+//         BottomNavigationBarItem(
+//           icon: Icon(Icons.history),
+//           label: 'Recents',
+//         ),
+//         BottomNavigationBarItem(
+//           icon: Icon(Icons.contacts),
+//           label: 'Contacts',
+//         ),
+        
+//       ],
+//       currentIndex: currentIndex,
+//       selectedItemColor: Colors.blue,
+//       unselectedItemColor: Colors.grey,
+//       backgroundColor: Colors.white,
+//       type: BottomNavigationBarType.fixed,
+//       showSelectedLabels: true,
+//       showUnselectedLabels: true,
+//       elevation: 8.0,
+//       onTap: onTap, // Directly call the onTap function from the parent
+//     );
+//   }
+// }

@@ -1,18 +1,28 @@
-// import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:voicecall/models/user.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:voicecall/models/user.dart' as AppUserModel; // Alias for clarity
 
-// class FirestoreMethods {
-//   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+class FirestoreMethods {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-//   Future<void> saveUserData(User user) async {
-//     await _firestore.collection('users').doc(user.uid).set(user.toMap());
-//   }
+  Future<void> saveUserData(AppUserModel.User user) async {
+    try {
+      await _firestore.collection('users').doc(user.uid).set(user.toMap());
+    } catch (e) {
+      print('Failed to save user data: $e');
+      rethrow; // Rethrow to catch the error in the UI layer
+    }
+  }
 
-//   Future<User?> getUserData(String uid) async {
-//     DocumentSnapshot doc = await _firestore.collection('users').doc(uid).get();
-//     if (doc.exists) {
-//       return User.fromMap(doc.data() as Map<String, dynamic>);
-//     }
-//     return null;
-//   }
-// }
+  Future<AppUserModel.User?> getUserData(String uid) async {
+    try {
+      DocumentSnapshot doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists) {
+        return AppUserModel.User.fromMap(doc.data() as Map<String, dynamic>);
+      }
+    } catch (e) {
+      print('Error fetching user data: $e');
+    }
+    return null;
+  }
+}
+
