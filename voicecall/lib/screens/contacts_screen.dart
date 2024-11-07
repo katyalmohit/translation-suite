@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart'; // For making phone calls
+import 'package:voicecall/screens/audio_calling_screen.dart';
 import 'package:voicecall/screens/contact_profile_screen.dart';
 import 'package:voicecall/screens/profile_screen.dart';
 import 'package:voicecall/translations/translation_screen.dart';
@@ -78,7 +79,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             _buildContactsList(),
           ],
         ),
-        floatingActionButton: _isDeleteMode
+        floatingActionButton: _isDeleteMode && _contacts.isNotEmpty
             ? FloatingActionButton(
                 onPressed: _deleteSelectedContacts,
                 backgroundColor: Colors.red,
@@ -131,90 +132,118 @@ class _ContactsScreenState extends State<ContactsScreen> {
     );
   }
 
-Widget _buildContactsList() {
-  return Expanded(
-    child: ListView.builder(
-      itemCount: _contacts.length,
-      itemBuilder: (context, index) {
-        String name = _contacts[index]['name'] ?? '';
-        String phone = _contacts[index]['phone'] ?? '';
-        String imageUrl = _contacts[index]['imageUrl'] ?? '';
-        bool isSelected = _contacts[index]['isSelected'] ?? false;
-
-        if (_searchQuery.isNotEmpty &&
-            !name.toLowerCase().contains(_searchQuery.toLowerCase())) {
-          return Container(); // Filter results based on search query
-        }
-
-        return ListTile(
-          leading: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_isDeleteMode) // Show checkbox in delete mode
-                Checkbox(
-                  value: isSelected,
-                  onChanged: (value) {
-                    setState(() {
-                      _contacts[index]['isSelected'] = value ?? false;
-                      _selectAll = _contacts.every((contact) => contact['isSelected']);
-                    });
-                  },
-                ),
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ContactProfileScreen(
-                        contact: _contacts[index],
-                      ),
-                    ),
-                  );
-                },
-                child: CircleAvatar(
-                  radius: 25,
-                  backgroundImage: imageUrl.isNotEmpty
-                      ? NetworkImage(imageUrl)
-                      : const AssetImage('assets/icon.jpg') as ImageProvider,
-                ),
-              ),
-            ],
+  Widget _buildContactsList() {
+    if (_contacts.isEmpty) {
+      return const Expanded(
+        child: Center(
+          child: Text(
+            'No contacts present now.',
+            style: TextStyle(fontSize: 18, color: Colors.grey),
           ),
-          title: Text(name),
-          subtitle: Text(phone),
-          trailing: IconButton(
-            icon: const Icon(Icons.call, color: Colors.green),
-            onPressed: () => _makePhoneCall(phone),
-          ),
-        );
-      },
-    ),
-  );
-}
-
-
-
-
-
-
-  Future<void> _makePhoneCall(String phoneNumber) async {
-  final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
-
-  try {
-    if (await canLaunchUrl(phoneUri)) {
-      await launchUrl(phoneUri);
-    } else {
-      throw 'Could not launch $phoneNumber';
+        ),
+      );
     }
-  } catch (e) {
-    print('Error launching phone call: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not make the call')),
+
+    return Expanded(
+      child: ListView.builder(
+        itemCount: _contacts.length,
+        itemBuilder: (context, index) {
+          String name = _contacts[index]['name'] ?? '';
+          String phone = _contacts[index]['phone'] ?? '';
+          String imageUrl = _contacts[index]['imageUrl'] ?? '';
+          bool isSelected = _contacts[index]['isSelected'] ?? false;
+
+          if (_searchQuery.isNotEmpty &&
+              !name.toLowerCase().contains(_searchQuery.toLowerCase())) {
+            return Container(); // Filter results based on search query
+          }
+
+          return ListTile(
+            leading: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_isDeleteMode) // Show checkbox in delete mode
+                  Checkbox(
+                    value: isSelected,
+                    onChanged: (value) {
+                      setState(() {
+                        _contacts[index]['isSelected'] = value ?? false;
+                        _selectAll =
+                            _contacts.every((contact) => contact['isSelected']);
+                      });
+                    },
+                  ),
+                GestureDetector(
+                  onTap: () async {
+                    // Use await to wait for the result and refresh contacts on return
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ContactProfileScreen(
+                          contact: _contacts[index],
+                        ),
+                      ),
+                    );
+
+                    // Refresh contacts list after returning from the editing screen
+                    _fetchContacts();
+                  },
+                  child: CircleAvatar(
+                    radius: 25,
+                    backgroundImage: imageUrl.isNotEmpty
+                        ? NetworkImage(imageUrl)
+                        : const AssetImage('assets/icon.jpg') as ImageProvider,
+                  ),
+                ),
+              ],
+            ),
+            title: Text(name),
+            subtitle: Text(phone),
+            trailing: IconButton(
+              icon: const Icon(Icons.call, color: Colors.green),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AudioCallingScreen(
+                      enteredNumber: phone, // Pass the contact's phone number
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
     );
   }
-}
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        throw 'Could not launch $phoneNumber';
+      }
+    } catch (e) {
+      print('Error launching phone call: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not make the call')),
+      );
+    }
+  }
 
   Future<void> _deleteSelectedContacts() async {
+    // Check if any contacts are selected
+    if (!_contacts.any((contact) => contact['isSelected'])) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No contacts selected to delete')),
+      );
+      return;
+    }
+
     try {
       for (var contact in _contacts.where((c) => c['isSelected'])) {
         await _firestore.collection('contacts').doc(contact['id']).delete();
@@ -252,9 +281,15 @@ Widget _buildContactsList() {
     ).then((value) {
       switch (value) {
         case 'delete':
-          setState(() {
-            _isDeleteMode = true;
-          });
+          if (_contacts.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('No contacts to delete')),
+            );
+          } else {
+            setState(() {
+              _isDeleteMode = true;
+            });
+          }
           break;
         case 'profile':
           Navigator.push(

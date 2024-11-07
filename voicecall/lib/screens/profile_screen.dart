@@ -1,9 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import 'package:voicecall/firebase/wrapper.dart';
 import 'package:voicecall/screens/edit_profile_screen.dart';
 import '../widgets/back_app_bar.dart';
@@ -43,7 +43,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    final pickedFile =
+        await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
         _image = File(pickedFile.path);
@@ -53,62 +54,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _uploadImage() async {
-  if (_image == null) {
-    print("No image selected.");
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please select an image first.')),
+    if (_image == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select an image first.')),
+      );
+      return;
+    }
+
+    // Show a persistent SnackBar with a loading message
+    final snackBar = SnackBar(
+      content: Row(
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(width: 20),
+          const Expanded(child: Text('Uploading profile picture...')),
+        ],
+      ),
+      duration: const Duration(days: 1), // Keep it visible until dismissed
     );
-    return;
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
+
+    try {
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('profile_images')
+          .child('${user?.uid}.jpg');
+
+      UploadTask uploadTask = ref.putFile(_image!);
+      await uploadTask;
+
+      // Get the download URL
+      String downloadURL = await ref.getDownloadURL();
+
+      // Save the download URL to Firestore
+      await FirebaseFirestore.instance.collection('users').doc(user?.uid).update({
+        'profileImage': downloadURL,
+      });
+
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile picture updated successfully!')),
+      );
+
+      setState(() {
+        userData?['profileImage'] = downloadURL; // Update the image on screen
+      });
+    } catch (e) {
+      print("Error during upload: $e");
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload failed: $e')),
+      );
+    }
   }
-
-  try {
-    final ref = FirebaseStorage.instance
-        .ref()
-        .child('profile_images')
-        .child('${user?.uid}.jpg');
-
-    print("Uploading image to Firebase Storage...");
-
-    // Start the upload and wait for completion
-    UploadTask uploadTask = ref.putFile(_image!);
-
-    // Listen for upload task state changes
-    uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
-      print('Upload state: ${snapshot.state}'); // Prints upload state
-      print('Transferred: ${snapshot.bytesTransferred} bytes');
-    });
-
-    // Wait for the task to complete
-    await uploadTask;
-
-    print("Image uploaded successfully.");
-
-    // Get the download URL
-    String downloadURL = await ref.getDownloadURL();
-    print("Download URL: $downloadURL");
-
-    // Save the download URL to Firestore
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user?.uid)
-        .update({
-      'profileImage': downloadURL,
-    });
-
-    print("Profile image URL saved to Firestore.");
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile picture updated!')),
-    );
-  } catch (e) {
-    print("Error during upload: $e");
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Upload failed: $e')),
-    );
-  }
-}
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -165,7 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 8),
             Text(
               userData!['phoneNumber'] ?? 'N/A',
-              style: const TextStyle(fontSize:18, color: Colors.grey),
+              style: const TextStyle(fontSize: 18, color: Colors.grey),
             ),
             const SizedBox(height: 20),
 
@@ -181,12 +180,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
+                  onPressed: () async {
+                    final updatedData = await Navigator.push(
                       context,
                       MaterialPageRoute(
                           builder: (context) => const EditProfileScreen()),
                     );
+                    if (updatedData != null && mounted) {
+                      setState(() {
+                        userData?.addAll(updatedData as Map<String, dynamic>);
+                      });
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color.fromARGB(191, 246, 21, 5),

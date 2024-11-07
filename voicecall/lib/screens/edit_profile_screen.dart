@@ -50,30 +50,36 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  Future<void> _saveProfile() async {
-    setState(() => _isLoading = true); // Start loading indicator
+Future<void> _saveProfile() async {
+  setState(() => _isLoading = true);
 
-    try {
-      await _firestore.collection('users').doc(user?.uid).update({
-        'fullName': _nameController.text,
-        'birthday': _birthdayController.text,
-        'location': _locationController.text,
-      });
+  try {
+    // Update user data in Firestore
+    Map<String, dynamic> updatedUserData = {
+      'fullName': _nameController.text,
+      'birthday': _birthdayController.text,
+      'location': _locationController.text,
+      'phoneNumber': _phoneController.text,  // Include phone number
+      'email': _emailController.text,        // Include email
+    };
+    await _firestore.collection('users').doc(user?.uid).update(updatedUserData);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated successfully!')),
-      );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Profile updated successfully!')),
+    );
 
-      Navigator.pop(context); // Navigate back after saving
-    } catch (e) {
-      print('Failed to update profile: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update profile.')),
-      );
-    } finally {
-      setState(() => _isLoading = false); // Stop loading indicator
-    }
+    // Pass all data back to ProfileScreen
+    Navigator.pop(context, updatedUserData);
+  } catch (e) {
+    print('Failed to update profile: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Failed to update profile.')),
+    );
+  } finally {
+    setState(() => _isLoading = false);
   }
+}
+
 
   void _showDialog(String message) {
     showDialog(

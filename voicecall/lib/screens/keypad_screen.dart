@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:voicecall/screens/audio_calling_screen.dart';
 import 'package:voicecall/screens/new_contact.dart';
 import 'package:voicecall/screens/profile_screen.dart';
 import 'package:voicecall/screens/contact_profile_screen.dart';
@@ -242,26 +243,38 @@ void _navigateToContactProfileScreen() async {
     );
   }
 
-  // Call and Delete Buttons
-  Widget _buildCallAndDeleteButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _buildCircleButton(
-          color: Colors.green,
-          icon: Icons.call,
-          onTap: () {
-            print('Calling $_enteredNumber');
-          },
-        ),
-        _buildCircleButton(
-          color: Colors.red,
-          icon: Icons.backspace,
-          onTap: _deleteLastDigit,
-        ),
-      ],
-    );
-  }
+  // Call and Delete Buttons// Call and Delete Buttons
+Widget _buildCallAndDeleteButtons() {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    children: [
+      _buildCircleButton(
+        color: Colors.green,
+        icon: Icons.call,
+        onTap: () {
+          if (_enteredNumber.isNotEmpty) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AudioCallingScreen(enteredNumber: _enteredNumber),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please enter a phone number.')),
+            );
+          }
+        },
+      ),
+      _buildCircleButton(
+        color: Colors.red,
+        icon: Icons.backspace,
+        onTap: _deleteLastDigit,
+      ),
+    ],
+  );
+}
+
 
   // Reusable Circle Button Widget
   Widget _buildCircleButton({
@@ -319,3 +332,8 @@ void _navigateToContactProfileScreen() async {
     });
   }
 }
+
+
+
+
+

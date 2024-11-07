@@ -19,6 +19,7 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
   final ImagePicker _picker = ImagePicker();
 
   bool _isEditing = false;
+  bool _isSaving = false; // Track the saving/loading state
   File? _newImageFile;
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
@@ -31,8 +32,7 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
     _nameController = TextEditingController(text: widget.contact['name']);
     _phoneController = TextEditingController(text: widget.contact['phone']);
     _emailController = TextEditingController(text: widget.contact['email']);
-    _locationController =
-        TextEditingController(text: widget.contact['location']);
+    _locationController = TextEditingController(text: widget.contact['location']);
   }
 
   @override
@@ -69,6 +69,8 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
   }
 
   Future<void> _saveContact() async {
+    setState(() => _isSaving = true); // Show loading indicator
+
     String? imageUrl = widget.contact['imageUrl'];
     if (_newImageFile != null) {
       imageUrl = await _uploadImage();
@@ -89,12 +91,14 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
 
       setState(() {
         _isEditing = false;
+        _isSaving = false; // Hide loading indicator
       });
     } catch (e) {
       print('Failed to update contact: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to update contact')),
       );
+      setState(() => _isSaving = false); // Hide loading indicator
     }
   }
 
@@ -159,6 +163,13 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
               _buildTextField('Location', _locationController, Icons.location_on),
               const SizedBox(height: 25),
               if (_isEditing) _buildSaveAndCancelButtons(),
+              if (_isSaving)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                ), // Show loading spinner
             ],
           ),
         ),
@@ -166,39 +177,38 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
     );
   }
 
-Widget _buildTextField(
-    String label, TextEditingController controller, IconData icon) {
-  return TextField(
-    controller: controller,
-    enabled: _isEditing,
-    style: const TextStyle(
-      color: Color.fromARGB(124, 0, 0, 0), // Change the text color to black (or any color)
-      fontSize: 18, // Optional: Increase font size for better visibility
-      fontWeight: FontWeight.w500, // Optional: Adjust font weight
-    ),
-    decoration: InputDecoration(
-      labelText: label,
-      labelStyle: const TextStyle(
-        color: Colors.grey, // Change the label text color
-        fontWeight: FontWeight.bold, // Optional: Bold label
+  Widget _buildTextField(
+      String label, TextEditingController controller, IconData icon) {
+    return TextField(
+      controller: controller,
+      enabled: _isEditing,
+      style: const TextStyle(
+        color: Color.fromARGB(124, 0, 0, 0), // Change the text color to black (or any color)
+        fontSize: 18, // Optional: Increase font size for better visibility
+        fontWeight: FontWeight.w500, // Optional: Adjust font weight
       ),
-      prefixIcon: Icon(icon, color: Colors.indigo),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(
+          color: Colors.grey, // Change the label text color
+          fontWeight: FontWeight.bold, // Optional: Bold label
+        ),
+        prefixIcon: Icon(icon, color: Colors.indigo),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        filled: true, // Add fill color for better visibility
+        fillColor: const Color.fromARGB(255, 230, 230, 250), // Light background color
       ),
-      filled: true, // Add fill color for better visibility
-      fillColor: const Color.fromARGB(255, 230, 230, 250), // Light background color
-    ),
-  );
-}
-
+    );
+  }
 
   Widget _buildSaveAndCancelButtons() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         ElevatedButton(
-          onPressed: _saveContact,
+          onPressed: _isSaving ? null : _saveContact, // Disable button when saving
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green,
             padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
@@ -212,11 +222,14 @@ Widget _buildTextField(
           ),
         ),
         ElevatedButton(
-          onPressed: () {
-            setState(() {
-              _isEditing = false;
-            });
-          },
+          onPressed: _isSaving
+              ? null
+              : () {
+                  setState(() {
+                    _isEditing = false;
+                    _newImageFile = null; // Reset the image file if edit is canceled
+                  });
+                },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.red,
             padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
