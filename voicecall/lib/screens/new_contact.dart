@@ -40,54 +40,94 @@ class _NewContactScreenState extends State<NewContactScreen> {
     setState(() {}); // Refresh UI with selected image
   }
 
-  // Function to save contact to Firestore
-  Future<void> _saveContact() async {
-    if (_nameController.text.isEmpty || _phoneController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name and Phone number are required.')),
+  // Function to save contact to Firestore with duplicate check
+// Function to save contact to Firestore with duplicate check and loading indicator
+Future<void> _saveContact() async {
+  if (_nameController.text.isEmpty || _phoneController.text.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Name and Phone number are required.')),
+    );
+    return;
+  }
+
+  setState(() => _isSaving = true); // Show loading spinner
+
+  // Show loading dialog
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      return const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Expanded(child: Text("Adding contact...")),
+          ],
+        ),
       );
+    },
+  );
+
+  try {
+    String userId = _currentUser?.uid ?? '';
+    String phoneNumber = _phoneController.text.trim();
+
+    // Check if contact with the same phone number already exists for this user
+    final QuerySnapshot existingContact = await _firestore
+        .collection('contacts')
+        .where('userId', isEqualTo: userId)
+        .where('phone', isEqualTo: phoneNumber)
+        .limit(1)
+        .get();
+
+    if (existingContact.docs.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This contact already exists.')),
+      );
+      setState(() => _isSaving = false); // Stop loading spinner
       return;
     }
 
-    setState(() => _isSaving = true); // Show loading spinner
+    String? imageUrl;
 
-    try {
-      String? imageUrl;
-
-      // If image is selected, upload it to Firebase Storage
-      if (_image != null) {
-        final ref = FirebaseStorage.instance
-            .ref()
-            .child('contacts/${_currentUser?.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg');
-        await ref.putFile(File(_image!.path));
-        imageUrl = await ref.getDownloadURL();
-      }
-
-      // Create a new contact document in Firestore
-      await _firestore.collection('contacts').add({
-        'name': _nameController.text,
-        'phone': _phoneController.text,
-        'email': _emailController.text.isNotEmpty ? _emailController.text : null,
-        'location': _locationController.text.isNotEmpty ? _locationController.text : null,
-        'imageUrl': imageUrl,
-        'userId': _currentUser?.uid,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Contact saved successfully!')),
-      );
-
-      Navigator.pop(context); // Go back to the previous screen
-    } catch (e) {
-      print('Failed to save contact: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to save contact.')),
-      );
-    } finally {
-      setState(() => _isSaving = false); // Stop loading spinner
+    // If image is selected, upload it to Firebase Storage
+    if (_image != null) {
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('contacts/$userId/${DateTime.now().millisecondsSinceEpoch}.jpg');
+      await ref.putFile(File(_image!.path));
+      imageUrl = await ref.getDownloadURL();
     }
+
+    // Create a new contact document in Firestore
+    await _firestore.collection('contacts').add({
+      'name': _nameController.text,
+      'phone': phoneNumber,
+      'email': _emailController.text.isNotEmpty ? _emailController.text : null,
+      'location': _locationController.text.isNotEmpty ? _locationController.text : null,
+      'imageUrl': imageUrl,
+      'userId': userId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    Navigator.pop(context); // Close loading dialog
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Contact saved successfully!')),
+    );
+
+    Navigator.pop(context); // Go back to the previous screen
+  } catch (e) {
+    Navigator.pop(context); // Close loading dialog
+    print('Failed to save contact: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Failed to save contact.')),
+    );
+  } finally {
+    setState(() => _isSaving = false); // Stop loading spinner
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -148,7 +188,7 @@ class _NewContactScreenState extends State<NewContactScreen> {
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        border: OutlineInputBorder(),
+        border: const OutlineInputBorder(),
         filled: true,
         fillColor: Colors.grey[200],
         contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),

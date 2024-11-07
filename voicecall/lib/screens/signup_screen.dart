@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:voicecall/screens/otp_screen.dart';
 import 'package:voicecall/screens/recent_screen.dart';
 import '../widgets/customized_button.dart';
 import '../widgets/customized_textfield.dart';
@@ -23,10 +24,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController _birthdayController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _countryCodeController = TextEditingController();
 
   final AuthMethods _authMethods = AuthMethods();
   final FirestoreMethods _firestoreMethods = FirestoreMethods();
   bool _isLoading = false;
+  late String verificationId; // For OTP verification
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _emailController.dispose();
+    _phoneNumberController.dispose();
+    _birthdayController.dispose();
+    _locationController.dispose();
+    _passwordController.dispose();
+    _countryCodeController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,8 +73,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       Padding(
                         padding: const EdgeInsets.only(top: 10.0),
                         child: IconButton(
-                          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back_ios,
+                              color: Colors.black),
+                          onPressed: () {
+                            _clearTextFields();
+                            Navigator.pop(context);
+                          },
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -72,33 +91,43 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                       ),
                       const SizedBox(height: 15),
-
                       CustomizedTextfield(
                         myController: _fullNameController,
                         hintText: "Full Name",
                         isPassword: false,
                       ),
-
                       CustomizedTextfield(
                         myController: _emailController,
                         hintText: "Email Address",
                         isPassword: false,
                       ),
-
                       CustomizedTextfield(
                         myController: _passwordController,
                         hintText: "Password",
                         isPassword: true,
                         keyboardType: TextInputType.visiblePassword,
                       ),
-
-                      CustomizedTextfield(
-                        myController: _phoneNumberController,
-                        hintText: "Phone Number",
-                        isPassword: false,
-                        keyboardType: TextInputType.phone,
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 140,
+                            child: CustomizedTextfield(
+                              myController: _countryCodeController,
+                              hintText: "+91 (Code)",
+                              isPassword: false,
+                              keyboardType: TextInputType.phone,
+                            ),
+                          ),
+                          Expanded(
+                            child: CustomizedTextfield(
+                              myController: _phoneNumberController,
+                              hintText: "Phone Number",
+                              isPassword: false,
+                              keyboardType: TextInputType.phone,
+                            ),
+                          ),
+                        ],
                       ),
-
                       GestureDetector(
                         onTap: _pickDate,
                         child: AbsorbPointer(
@@ -109,13 +138,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           ),
                         ),
                       ),
-
                       CustomizedTextfield(
                         myController: _locationController,
                         hintText: "Location",
                         isPassword: false,
                       ),
-
                       const SizedBox(height: 5),
                       Center(
                         child: _isLoading
@@ -132,6 +159,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       Center(
                         child: InkWell(
                           onTap: () {
+                            _clearTextFields();
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -172,7 +200,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
 Future<void> _registerUser() async {
   String fullName = _fullNameController.text.trim();
   String email = _emailController.text.trim();
+  String countryCode = _countryCodeController.text.trim();
   String phoneNumber = _phoneNumberController.text.trim();
+  String fullPhoneNumber = '$countryCode$phoneNumber';
   String birthday = _birthdayController.text.trim();
   String location = _locationController.text.trim();
   String password = _passwordController.text.trim();
@@ -187,76 +217,106 @@ Future<void> _registerUser() async {
     return;
   }
 
-  setState(() => _isLoading = true); // Start loading spinner
+  // Check if the country code has exactly 3 characters and the phone number has 10 digits
+  if (countryCode.length != 3 || !countryCode.startsWith('+')) {
+    _showErrorDialog("Country code should be exactly 3 characters and start with '+'.");
+    return;
+  }
+
+  if (phoneNumber.length != 10) {
+    _showErrorDialog("Phone number should be exactly 10 digits.");
+    return;
+  }
+
+  setState(() => _isLoading = true);
 
   try {
-    // Register the user with Firebase Authentication
     UserCredential userCredential = await FirebaseAuth.instance
         .createUserWithEmailAndPassword(email: email, password: password);
-
     User? user = userCredential.user;
 
     if (user != null) {
-      // Save user data to Firestore
       await _firestoreMethods.saveUserData(
         AppUserModel.User(
           uid: user.uid,
           fullName: fullName,
           email: email,
-          phoneNumber: phoneNumber,
+          phoneNumber: fullPhoneNumber,
           birthday: birthday,
           location: location,
         ),
       );
 
-      // Send the email verification
       await user.sendEmailVerification();
 
-      // Give Firebase some time to update the user state
-      await Future.delayed(const Duration(seconds: 2));
+      // Show a loading dialog before OTP screen redirection
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            content: Row(
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(width: 20),
+                const Expanded(child: Text("Redirecting to OTP screen...")),
+              ],
+            ),
+          );
+        },
+      );
 
-      // Reload the user to confirm the state
-      await user.reload();
-      user = FirebaseAuth.instance.currentUser;
-
-      // Show a success dialog to the user
-      _showInfoDialog("Verification email sent! Please check your inbox.");
-
-      // Uncomment this after testing if needed
-      // await FirebaseAuth.instance.signOut();
+      // Initiate phone verification immediately after showing the dialog
+      FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: fullPhoneNumber,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          await user.linkWithCredential(credential);
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          Navigator.pop(context); // Close loading dialog
+          _showErrorDialog('Phone verification failed: ${e.message}');
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          this.verificationId = verificationId;
+          Navigator.pop(context); // Close loading dialog
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (context) => OtpScreen(verificationId: verificationId)),
+          );
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {},
+      );
     }
   } on FirebaseAuthException catch (e) {
     _showErrorDialog(e.message ?? "Registration failed. Please try again.");
-  } catch (e) {
-    _showErrorDialog("An unknown error occurred.");
   } finally {
-    setState(() => _isLoading = false); // Stop loading spinner
+    setState(() => _isLoading = false);
   }
 }
 
 
-// Display a dialog with a message
-void _showInfoDialog(String message) {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text("Info"),
-      content: Text(message),
-      actions: [
-        TextButton(
-          onPressed: () {
-            Navigator.pop(context); // Close the dialog
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-            );
-          },
-          child: const Text("OK"),
-        ),
-      ],
-    ),
-  );
-}
+
+
+
+  void _showInfoDialog(String message, VoidCallback onDialogClosed) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Info"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              onDialogClosed();
+            },
+            child: const Text("OK"),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _pickDate() async {
     DateTime? pickedDate = await showDatePicker(
@@ -289,4 +349,13 @@ void _showInfoDialog(String message) {
     );
   }
 
+  void _clearTextFields() {
+    _fullNameController.clear();
+    _emailController.clear();
+    _phoneNumberController.clear();
+    _birthdayController.clear();
+    _locationController.clear();
+    _passwordController.clear();
+    _countryCodeController.clear();
+  }
 }

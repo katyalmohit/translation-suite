@@ -1,12 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:voicecall/firebase/wrapper.dart';
+import 'package:voicecall/screens/otp_screen.dart'; 
+import 'signup_screen.dart'; 
+import 'forgot_password_screen.dart'; 
 import '../widgets/customized_button.dart';
 import '../widgets/customized_textfield.dart';
 import '../widgets/loading_spinner.dart';
-import 'recent_screen.dart'; // Adjust if needed
-import 'signup_screen.dart'; // To navigate to signup screen
-import '../services/auth_methods.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,7 +19,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final AuthMethods _authMethods = AuthMethods();
   bool _isLoading = false;
 
   Future<void> _loginUser() async {
@@ -33,49 +33,64 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final authMethods = AuthMethods();
-      final result = await authMethods.login(email, password);
+      UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
+      User? user = userCredential.user;
 
-      if (result == null) {
-        User? user = FirebaseAuth.instance.currentUser;
+      await user?.reload();
+      user = FirebaseAuth.instance.currentUser;
 
-        // Reload user to ensure the latest state is fetched
-        await user?.reload();
-        user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        bool isPhoneVerified = prefs.getBool('isPhoneVerified') ?? false;
 
-        if (user != null && !user.emailVerified) {
-          // Show a dialog to prompt for verification
-          _showVerificationDialog(user);
-        } else if (user != null && user.emailVerified) {
+        if (!user.emailVerified) {
+          _showVerificationDialog(user, type: "email");
+        } else if (!isPhoneVerified) {
+          _showVerificationDialog(user, type: "phone");
+        } else {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const Wrapper()),
           );
         }
-      } else {
-        _showErrorDialog(result); // Show Firebase error message
       }
     } catch (e) {
-      _showErrorDialog("An unknown error occurred.");
+      _showErrorDialog("An unknown error occurred: ${e.toString()}");
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  void _showVerificationDialog(User user) {
+  void _showVerificationDialog(User user, {required String type}) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Email Not Verified'),
-        content: const Text('Please verify your email to continue.'),
+        title: Text('${type == "email" ? "Email" : "Phone"} Not Verified'),
+        content: Text('Please verify your $type to continue.'),
         actions: [
-          TextButton(
-            onPressed: () async {
-              await user.sendEmailVerification();
-              _showInfoDialog("Verification email resent. Please check your inbox.");
-            },
-            child: const Text('Resend Email'),
-          ),
+          if (type == "email")
+            TextButton(
+              onPressed: () async {
+                await user.sendEmailVerification();
+                _showInfoDialog("Verification email resent. Please check your inbox.");
+              },
+              child: const Text('Resend Email'),
+            ),
+          if (type == "phone")
+            TextButton(
+              onPressed: () async {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => OtpScreen(
+                      verificationId: user.phoneNumber ?? "",
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Verify Phone'),
+            ),
           TextButton(
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
@@ -89,22 +104,6 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _forgotPassword() async {
-    String email = _emailController.text.trim();
-
-    if (email.isEmpty) {
-      _showErrorDialog("Please enter your email to reset your password.");
-      return;
-    }
-
-    try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      _showInfoDialog("Password reset email sent. Please check your inbox.");
-    } catch (e) {
-      _showErrorDialog("An error occurred while sending reset email. Please try again.");
-    }
   }
 
   void _showErrorDialog(String message) {
@@ -183,27 +182,28 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 30),
-
-                      // Email TextField
                       CustomizedTextfield(
                         myController: _emailController,
                         hintText: "Email Address",
                         isPassword: false,
                       ),
-
-                      // Password TextField
                       CustomizedTextfield(
                         myController: _passwordController,
                         hintText: "Password",
                         isPassword: true,
                         keyboardType: TextInputType.visiblePassword,
                       ),
-
-                      // Forgot Password Button
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: _forgotPassword,
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ForgotPasswordScreen(),
+                              ),
+                            );
+                          },
                           child: const Text(
                             "Forgot Password?",
                             style: TextStyle(
@@ -213,9 +213,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-
-
-                      // Login Button with Loading Spinner
                       Center(
                         child: _isLoading
                             ? const LoadingSpinner()
@@ -228,8 +225,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                       ),
                       const SizedBox(height: 10),
-
-                      // Don't have an account? Sign Up Now
                       Center(
                         child: InkWell(
                           onTap: () {
