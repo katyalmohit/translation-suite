@@ -68,7 +68,69 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
     }
   }
 
+  // Validation functions
+  String? _validateName(String name) {
+    if (name.isEmpty) return "Name cannot be empty.";
+    if (RegExp(r'^\d+$').hasMatch(name)) {
+      return "Name cannot be entirely numbers.";
+    }
+    return null;
+  }
+
+  String? _validatePhoneNumber(String phone) {
+    if (phone.isEmpty) return "Phone number cannot be empty.";
+    if (!RegExp(r'^\d+$').hasMatch(phone)) {
+      return "Phone number should contain only digits.";
+    }
+    return null;
+  }
+
+  String? _validateEmail(String email) {
+    if (email.isEmpty) return null; // Optional field, no error if empty
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w]{2,4}$').hasMatch(email)) {
+      return "Enter a valid email address.";
+    }
+    return null;
+  }
+
+  String? _validateLocation(String location) {
+    if (RegExp(r'^\d+$').hasMatch(location)) {
+      return "Location cannot be entirely numbers.";
+    }
+    return null;
+  }
+
   Future<void> _saveContact() async {
+    String name = _nameController.text.trim();
+    String phone = _phoneController.text.trim();
+    String email = _emailController.text.trim();
+    String location = _locationController.text.trim();
+
+    // Validate fields sequentially and show first error found
+    String? nameError = _validateName(name);
+    if (nameError != null) {
+      _showErrorDialog(nameError);
+      return;
+    }
+
+    String? phoneError = _validatePhoneNumber(phone);
+    if (phoneError != null) {
+      _showErrorDialog(phoneError);
+      return;
+    }
+
+    String? emailError = _validateEmail(email);
+    if (emailError != null) {
+      _showErrorDialog(emailError);
+      return;
+    }
+
+    String? locationError = _validateLocation(location);
+    if (locationError != null) {
+      _showErrorDialog(locationError);
+      return;
+    }
+
     setState(() => _isSaving = true); // Show loading indicator
 
     String? imageUrl = widget.contact['imageUrl'];
@@ -100,6 +162,23 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
       );
       setState(() => _isSaving = false); // Hide loading indicator
     }
+  }
+
+  // Error dialog to display validation errors
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

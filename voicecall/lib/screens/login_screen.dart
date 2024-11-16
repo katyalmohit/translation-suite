@@ -2,9 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:voicecall/firebase/wrapper.dart';
-import 'package:voicecall/screens/otp_screen.dart'; 
-import 'signup_screen.dart'; 
-import 'forgot_password_screen.dart'; 
+import 'package:voicecall/screens/otp_screen.dart';
+import 'signup_screen.dart';
+import 'forgot_password_screen.dart';
 import '../widgets/customized_button.dart';
 import '../widgets/customized_textfield.dart';
 import '../widgets/loading_spinner.dart';
@@ -21,46 +21,84 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  Future<void> _loginUser() async {
-    String email = _emailController.text.trim();
-    String password = _passwordController.text.trim();
+Future<void> _loginUser() async {
+  String email = _emailController.text.trim();
+  String password = _passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      _showErrorDialog("Please enter both email and password.");
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      UserCredential userCredential = await FirebaseAuth.instance
-          .signInWithEmailAndPassword(email: email, password: password);
-      User? user = userCredential.user;
-
-      await user?.reload();
-      user = FirebaseAuth.instance.currentUser;
-
-      if (user != null) {
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        bool isPhoneVerified = prefs.getBool('isPhoneVerified') ?? false;
-
-        if (!user.emailVerified) {
-          _showVerificationDialog(user, type: "email");
-        } else if (!isPhoneVerified) {
-          _showVerificationDialog(user, type: "phone");
-        } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const Wrapper()),
-          );
-        }
-      }
-    } catch (e) {
-      _showErrorDialog("An unknown error occurred: ${e.toString()}");
-    } finally {
-      setState(() => _isLoading = false);
-    }
+  // Validate each field separately and show a specific message
+  if (email.isEmpty) {
+    _showErrorDialog("Please enter your email.");
+    return;
   }
+  if (password.isEmpty) {
+    _showErrorDialog("Please enter your password.");
+    return;
+  }
+
+  setState(() => _isLoading = true);
+
+  try {
+    UserCredential userCredential = await FirebaseAuth.instance
+        .signInWithEmailAndPassword(email: email, password: password);
+    User? user = userCredential.user;
+
+    await user?.reload();
+    user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      bool isPhoneVerified = prefs.getBool('isPhoneVerified') ?? false;
+
+      if (!user.emailVerified) {
+        _showVerificationDialog(user, type: "email");
+      } else if (!isPhoneVerified) {
+        _showVerificationDialog(user, type: "phone");
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const Wrapper()),
+        );
+      }
+    }
+  } on FirebaseAuthException catch (e) {
+    String errorMessage;
+
+    // Handle Firebase error codes
+    switch (e.code) {
+      case 'user-not-found':
+        errorMessage = "No user found for this email.";
+        break;
+      case 'wrong-password':
+        errorMessage = "Invalid password. Please try again.";
+        break;
+      case 'invalid-email':
+        errorMessage = "The email address is invalid.";
+        break;
+      case 'user-disabled':
+        errorMessage = "This user account has been disabled.";
+        break;
+      case 'too-many-requests':
+        errorMessage =
+            "Too many login attempts. Please try again later.";
+        break;
+      case 'operation-not-allowed':
+        errorMessage =
+            "Email/password accounts are not enabled. Contact support.";
+        break;
+      default:
+        errorMessage = "An error occurred: ${e.message}";
+        break;
+    }
+
+    _showErrorDialog(errorMessage);
+  } catch (e) {
+    _showErrorDialog("An unknown error occurred: ${e.toString()}");
+  } finally {
+    setState(() => _isLoading = false);
+  }
+}
+
+
 
   void _showVerificationDialog(User user, {required String type}) {
     showDialog(
@@ -73,7 +111,8 @@ class _LoginScreenState extends State<LoginScreen> {
             TextButton(
               onPressed: () async {
                 await user.sendEmailVerification();
-                _showInfoDialog("Verification email resent. Please check your inbox.");
+                _showInfoDialog(
+                    "Verification email resent. Please check your inbox.");
               },
               child: const Text('Resend Email'),
             ),
@@ -168,7 +207,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       Padding(
                         padding: const EdgeInsets.only(top: 10.0),
                         child: IconButton(
-                          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+                          icon: const Icon(Icons.arrow_back_ios,
+                              color: Colors.black),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ),

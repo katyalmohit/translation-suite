@@ -22,6 +22,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   bool _isDeleteMode = false;
   bool _selectAll = false;
+    bool _isContactsLoaded = false; // Flag to track contacts loading status
+
   String _searchQuery = '';
   List<Map<String, dynamic>> _contacts = [];
 
@@ -54,7 +56,15 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
       setState(() {
         _contacts = fetchedContacts;
+                _isContactsLoaded = true; // Mark as loaded
+
       });
+    // Show success message if contacts are loaded
+      if (fetchedContacts.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Contacts loaded successfully!')),
+        );
+      }
     } catch (e) {
       print('Error fetching contacts: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -62,7 +72,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
       );
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -76,7 +85,14 @@ class _ContactsScreenState extends State<ContactsScreen> {
             const SizedBox(height: 10),
             _buildSearchBar(),
             if (_isDeleteMode) _buildSelectAllCheckbox(),
-            _buildContactsList(),
+             if (!_isContactsLoaded) // Show loader while loading
+              const Expanded(
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else
+              _buildContactsList(),
           ],
         ),
         floatingActionButton: _isDeleteMode && _contacts.isNotEmpty
@@ -112,111 +128,137 @@ class _ContactsScreenState extends State<ContactsScreen> {
       ),
     );
   }
-
-  Widget _buildSelectAllCheckbox() {
-    return Row(
-      children: [
-        Checkbox(
-          value: _selectAll,
-          onChanged: (value) {
-            setState(() {
-              _selectAll = value ?? false;
-              for (var contact in _contacts) {
-                contact['isSelected'] = _selectAll;
-              }
-            });
-          },
-        ),
-        const Text('Select All'),
-      ],
-    );
-  }
-
-  Widget _buildContactsList() {
-    if (_contacts.isEmpty) {
-      return const Expanded(
-        child: Center(
-          child: Text(
-            'No contacts present now.',
-            style: TextStyle(fontSize: 18, color: Colors.grey),
+Widget _buildSelectAllCheckbox() {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Row(
+        children: [
+          Checkbox(
+            value: _selectAll,
+            onChanged: (value) {
+              setState(() {
+                _selectAll = value ?? false;
+                for (var contact in _contacts) {
+                  contact['isSelected'] = _selectAll;
+                }
+              });
+            },
           ),
-        ),
-      );
-    }
-
-    return Expanded(
-      child: ListView.builder(
-        itemCount: _contacts.length,
-        itemBuilder: (context, index) {
-          String name = _contacts[index]['name'] ?? '';
-          String phone = _contacts[index]['phone'] ?? '';
-          String imageUrl = _contacts[index]['imageUrl'] ?? '';
-          bool isSelected = _contacts[index]['isSelected'] ?? false;
-
-          if (_searchQuery.isNotEmpty &&
-              !name.toLowerCase().contains(_searchQuery.toLowerCase())) {
-            return Container(); // Filter results based on search query
-          }
-
-          return ListTile(
-            leading: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_isDeleteMode) // Show checkbox in delete mode
-                  Checkbox(
-                    value: isSelected,
-                    onChanged: (value) {
-                      setState(() {
-                        _contacts[index]['isSelected'] = value ?? false;
-                        _selectAll =
-                            _contacts.every((contact) => contact['isSelected']);
-                      });
-                    },
-                  ),
-                GestureDetector(
-                  onTap: () async {
-                    // Use await to wait for the result and refresh contacts on return
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ContactProfileScreen(
-                          contact: _contacts[index],
-                        ),
-                      ),
-                    );
-
-                    // Refresh contacts list after returning from the editing screen
-                    _fetchContacts();
-                  },
-                  child: CircleAvatar(
-                    radius: 25,
-                    backgroundImage: imageUrl.isNotEmpty
-                        ? NetworkImage(imageUrl)
-                        : const AssetImage('assets/icon.jpg') as ImageProvider,
-                  ),
-                ),
-              ],
-            ),
-            title: Text(name),
-            subtitle: Text(phone),
-            trailing: IconButton(
-              icon: const Icon(Icons.call, color: Colors.green),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AudioCallingScreen(
-                      enteredNumber: phone, // Pass the contact's phone number
-                    ),
-                  ),
-                );
-              },
-            ),
-          );
+          const Text('Select All'),
+        ],
+      ),
+      TextButton(
+        onPressed: () {
+          setState(() {
+            // Deselect all checkboxes
+            for (var contact in _contacts) {
+              contact['isSelected'] = false;
+            }
+            _isDeleteMode = false; // Exit delete mode
+            _selectAll = false;    // Reset select-all state
+          });
         },
+        child: const Text(
+          'Cancel',
+          style: TextStyle(color: Colors.red),
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildContactsList() {
+  // Filter contacts based on the search query
+  List<Map<String, dynamic>> filteredContacts = _contacts.where((contact) {
+    String name = contact['name'] ?? '';
+    String phone = contact['phone'] ?? '';
+    return name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+        phone.contains(_searchQuery);
+  }).toList();
+
+  // If no contacts match the search query, show a "No contacts found" message
+  if (filteredContacts.isEmpty) {
+    return const Expanded(
+      child: Center(
+        child: Text(
+          'No contacts found.',
+          style: TextStyle(fontSize: 18, color: Colors.grey),
+        ),
       ),
     );
   }
+
+  // Display filtered contacts
+  return Expanded(
+    child: ListView.builder(
+      itemCount: filteredContacts.length,
+      itemBuilder: (context, index) {
+        String name = filteredContacts[index]['name'] ?? '';
+        String phone = filteredContacts[index]['phone'] ?? '';
+        String imageUrl = filteredContacts[index]['imageUrl'] ?? '';
+        bool isSelected = filteredContacts[index]['isSelected'] ?? false;
+
+        return ListTile(
+          leading: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_isDeleteMode) // Show checkbox in delete mode
+                Checkbox(
+                  value: isSelected,
+                  onChanged: (value) {
+                    setState(() {
+                      filteredContacts[index]['isSelected'] = value ?? false;
+                    });
+                  },
+                ),
+              GestureDetector(
+                onTap: () async {
+                  // Navigate to ContactProfileScreen when the user icon is tapped
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ContactProfileScreen(
+                        contact: filteredContacts[index],
+                      ),
+                    ),
+                  );
+
+                  // Refresh contacts list after returning from the profile screen
+                  _fetchContacts();
+                },
+                child: CircleAvatar(
+                  radius: 25,
+                  backgroundImage: imageUrl.isNotEmpty
+                      ? NetworkImage(imageUrl)
+                      : const AssetImage('assets/icon.jpg') as ImageProvider,
+                ),
+              ),
+            ],
+          ),
+          title: Text(name),
+          subtitle: Text(phone),
+          trailing: IconButton(
+            icon: const Icon(Icons.call, color: Colors.green),
+            onPressed: () {
+              // Navigate to AudioCallingScreen when the call icon is tapped
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AudioCallingScreen(
+                    enteredNumber: phone,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    ),
+  );
+}
+
+
 
   Future<void> _makePhoneCall(String phoneNumber) async {
     final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
@@ -307,3 +349,5 @@ class _ContactsScreenState extends State<ContactsScreen> {
     });
   }
 }
+
+

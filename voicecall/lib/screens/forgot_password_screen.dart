@@ -27,7 +27,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _showSnackBar('Password reset email has been sent. Please check your inbox.');
       Navigator.pop(context); // Return to previous screen
     } catch (e) {
-      _showSnackBar('An error occurred. Please try again.');
+      _showSnackBar('Invalid email address');
     } finally {
       setState(() => _isLoading = false);
     }
