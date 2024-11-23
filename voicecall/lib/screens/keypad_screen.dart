@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:voicecall/screens/audio_calling_screen.dart';
 import 'package:voicecall/screens/new_contact.dart';
@@ -28,62 +29,80 @@ class _KeypadScreenState extends State<KeypadScreen> {
   void _deleteLastDigit() {
     if (_enteredNumber.isNotEmpty) {
       setState(() {
-        _enteredNumber =
-            _enteredNumber.substring(0, _enteredNumber.length - 1);
+        _enteredNumber = _enteredNumber.substring(0, _enteredNumber.length - 1);
       });
     }
   }
 
   // Show Bottom Sheet with Contact Options
-  void _showAddContactOptions() {
+
+  Future<void> _showAddContactOptions() async {
     if (_enteredNumber.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a phone number.')),
       );
       return;
     }
-  showModalBottomSheet(
-  context: context,
-  shape: const RoundedRectangleBorder(
-    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-  ),
-  builder: (context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      height: 250, // Set height to increase the size of the bottom sheet
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Add to Contacts", // Title at the top of the bottom sheet
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 20), // Space between title and options
-          ListTile(
-            leading: const Icon(Icons.person_add, color: Colors.blue),
-            title: const Text('Create New Contact'),
-            onTap: () {
-              Navigator.pop(context); // Close bottom sheet
-              _navigateToNewContactScreen();
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.edit, color: Colors.green),
-            title: const Text('Update Existing Contact'),
-            onTap: () {
-              Navigator.pop(context); // Close bottom sheet
-              _navigateToContactProfileScreen();
-            },
-          ),
-        ],
-      ),
-    );
-  },
-);
 
+    String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    // Check if contact already exists
+      final querySnapshot = await FirebaseFirestore.instance
+      .collection('contacts')
+      .where('userId', isEqualTo: userId) // Filter by userId
+      .where('phone', isEqualTo: _enteredNumber)
+      .get();
+
+    if (querySnapshot.docs.isNotEmpty) {
+      // Contact exists, show message and navigate to update existing contact
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This contact already exists.')),
+      );
+      _navigateToContactProfileScreen(); // Navigate to update existing contact screen
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          height: 250, // Set height to increase the size of the bottom sheet
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Add to Contacts", // Title at the top of the bottom sheet
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20), // Space between title and options
+              ListTile(
+                leading: const Icon(Icons.person_add, color: Colors.blue),
+                title: const Text('Create New Contact'),
+                onTap: () {
+                  Navigator.pop(context); // Close bottom sheet
+                  _navigateToNewContactScreen();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit, color: Colors.green),
+                title: const Text('Update Existing Contact'),
+                onTap: () {
+                  Navigator.pop(context); // Close bottom sheet
+                  _navigateToContactProfileScreen();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   // Navigate to New Contact Screen
@@ -97,32 +116,36 @@ class _KeypadScreenState extends State<KeypadScreen> {
   }
 
   // Navigate to Contact Profile Screen (Pass Example Data for Now)
-void _navigateToContactProfileScreen() async {
+  void _navigateToContactProfileScreen() async {
+
+    String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+     // Check if contact exists for the current user
   final querySnapshot = await FirebaseFirestore.instance
       .collection('contacts')
+      .where('userId', isEqualTo: userId) // Filter by userId
       .where('phone', isEqualTo: _enteredNumber)
       .get();
 
-  if (querySnapshot.docs.isEmpty) {
-    // If no contact is found, prompt to create a new contact
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Contact not found. Create a new contact.')),
-    );
-    _navigateToNewContactScreen(); // Navigate to create new contact
-  } else {
-    // If contact exists, navigate to ContactProfileScreen
-    final contactData = querySnapshot.docs.first.data();
-    contactData['id'] = querySnapshot.docs.first.id; // Add document ID
+    if (querySnapshot.docs.isEmpty) {
+      // If no contact is found, prompt to create a new contact
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Contact not found. Create a new contact.')),
+      );
+      _navigateToNewContactScreen(); // Navigate to create new contact
+    } else {
+      // If contact exists, navigate to ContactProfileScreen
+      final contactData = querySnapshot.docs.first.data();
+      contactData['id'] = querySnapshot.docs.first.id; // Add document ID
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ContactProfileScreen(contact: contactData),
-      ),
-    );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ContactProfileScreen(contact: contactData),
+        ),
+      );
+    }
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
@@ -244,37 +267,37 @@ void _navigateToContactProfileScreen() async {
   }
 
   // Call and Delete Buttons// Call and Delete Buttons
-Widget _buildCallAndDeleteButtons() {
-  return Row(
-    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-    children: [
-      _buildCircleButton(
-        color: Colors.green,
-        icon: Icons.call,
-        onTap: () {
-          if (_enteredNumber.isNotEmpty) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AudioCallingScreen(enteredNumber: _enteredNumber),
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Please enter a phone number.')),
-            );
-          }
-        },
-      ),
-      _buildCircleButton(
-        color: Colors.red,
-        icon: Icons.backspace,
-        onTap: _deleteLastDigit,
-      ),
-    ],
-  );
-}
-
+  Widget _buildCallAndDeleteButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildCircleButton(
+          color: Colors.green,
+          icon: Icons.call,
+          onTap: () {
+            if (_enteredNumber.isNotEmpty) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      AudioCallingScreen(enteredNumber: _enteredNumber),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please enter a phone number.')),
+              );
+            }
+          },
+        ),
+        _buildCircleButton(
+          color: Colors.red,
+          icon: Icons.backspace,
+          onTap: _deleteLastDigit,
+        ),
+      ],
+    );
+  }
 
   // Reusable Circle Button Widget
   Widget _buildCircleButton({
@@ -325,15 +348,9 @@ Widget _buildCallAndDeleteButtons() {
       } else if (value == 'translations') {
         Navigator.push(
           context,
-          MaterialPageRoute(
-              builder: (context) => const TranslationsScreen()),
+          MaterialPageRoute(builder: (context) => const TranslationsScreen()),
         );
       }
     });
   }
 }
-
-
-
-
-

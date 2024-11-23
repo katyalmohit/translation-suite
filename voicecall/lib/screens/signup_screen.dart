@@ -18,7 +18,7 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
-  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _userNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneNumberController = TextEditingController();
   final TextEditingController _birthdayController = TextEditingController();
@@ -33,7 +33,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   void dispose() {
-    _fullNameController.dispose();
+    _userNameController.dispose();
     _emailController.dispose();
     _phoneNumberController.dispose();
     _birthdayController.dispose();
@@ -42,6 +42,73 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _countryCodeController.dispose();
     super.dispose();
   }
+
+  // Validation functions for each field
+  String? _validateuserName(String userName) {
+    if (userName.isEmpty) return "User Name cannot be empty.";
+    if (RegExp(r'^\d+$').hasMatch(userName)) {
+      return "User Name cannot be entirely numbers.";
+    }
+    return null;
+  }
+
+  String? _validateEmail(String email) {
+    if (email.isEmpty) return "Email cannot be empty.";
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w]{2,4}$').hasMatch(email)) {
+      return "Enter a valid email address.";
+    }
+    return null;
+  }
+
+  String? _validatePassword(String password) {
+    if (password.isEmpty) return "Password cannot be empty.";
+    if (password.length < 6) {
+      return "Password must be at least 6 characters.";
+    }
+    return null;
+  }
+
+String? _validateCountryCode(String countryCode) {
+  if (countryCode.isEmpty) return "Country code cannot be empty.";
+  if (!RegExp(r'^\+\d{1,4}$').hasMatch(countryCode)) {
+    return "Country code must start with '+' followed by up to 4 digits.";
+  }
+  return null;
+}
+
+  String? _validatePhoneNumber(String phoneNumber) {
+    if (phoneNumber.isEmpty) return "Phone number cannot be empty.";
+    if (phoneNumber.length != 10) {
+      return "Phone number should be exactly 10 digits.";
+    }
+    return null;
+  }
+
+  String? _validateBirthday(String birthday) {
+    if (birthday.isEmpty) return "Birthday cannot be empty.";
+    try {
+      final dateParts = birthday.split('/');
+      final day = int.parse(dateParts[0]);
+      final month = int.parse(dateParts[1]);
+      final year = int.parse(dateParts[2]);
+      DateTime birthDate = DateTime(year, month, day);
+      if (birthDate.isAfter(DateTime.now())) {
+        return "Birthday cannot be in the future.";
+      }
+    } catch (_) {
+      return "Enter a valid date in DD/MM/YYYY format.";
+    }
+    return null;
+  }
+
+  String? _validateLocation(String location) {
+    if (location.isEmpty) return "Location cannot be empty.";
+    if (RegExp(r'^\d+$').hasMatch(location)) {
+      return "Location cannot be entirely numbers.";
+    }
+    return null;
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -92,8 +159,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                       const SizedBox(height: 15),
                       CustomizedTextfield(
-                        myController: _fullNameController,
-                        hintText: "Full Name",
+                        myController: _userNameController,
+                        hintText: "User Name",
                         isPassword: false,
                       ),
                       CustomizedTextfield(
@@ -103,7 +170,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                       CustomizedTextfield(
                         myController: _passwordController,
-                        hintText: "Password",
+                        hintText: "Password (Atleast 6 characters)",
                         isPassword: true,
                         keyboardType: TextInputType.visiblePassword,
                       ),
@@ -198,7 +265,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
 Future<void> _registerUser() async {
-  String fullName = _fullNameController.text.trim();
+  String userName = _userNameController.text.trim();
   String email = _emailController.text.trim();
   String countryCode = _countryCodeController.text.trim();
   String phoneNumber = _phoneNumberController.text.trim();
@@ -207,28 +274,75 @@ Future<void> _registerUser() async {
   String location = _locationController.text.trim();
   String password = _passwordController.text.trim();
 
-  if (fullName.isEmpty ||
-      email.isEmpty ||
-      password.isEmpty ||
-      phoneNumber.isEmpty ||
-      birthday.isEmpty ||
-      location.isEmpty) {
-    _showErrorDialog("Please fill out all fields.");
-    return;
-  }
+  // Validate fields sequentially and show first error found
+    String? userNameError = _validateuserName(userName);
+    if (userNameError != null) {
+      _showErrorDialog(userNameError);
+      return;
+    }
 
-  // Check if the country code has exactly 3 characters and the phone number has 10 digits
-  if (countryCode.length != 3 || !countryCode.startsWith('+')) {
-    _showErrorDialog("Country code should be exactly 3 characters and start with '+'.");
-    return;
-  }
+    String? emailError = _validateEmail(email);
+    if (emailError != null) {
+      _showErrorDialog(emailError);
+      return;
+    }
 
-  if (phoneNumber.length != 10) {
-    _showErrorDialog("Phone number should be exactly 10 digits.");
-    return;
-  }
+    String? passwordError = _validatePassword(password);
+    if (passwordError != null) {
+      _showErrorDialog(passwordError);
+      return;
+    }
 
-  setState(() => _isLoading = true);
+    String? countryCodeError = _validateCountryCode(countryCode);
+    if (countryCodeError != null) {
+      _showErrorDialog(countryCodeError);
+      return;
+    }
+
+    String? phoneNumberError = _validatePhoneNumber(phoneNumber);
+    if (phoneNumberError != null) {
+      _showErrorDialog(phoneNumberError);
+      return;
+    }
+
+    String? birthdayError = _validateBirthday(birthday);
+    if (birthdayError != null) {
+      _showErrorDialog(birthdayError);
+      return;
+    }
+
+    String? locationError = _validateLocation(location);
+    if (locationError != null) {
+      _showErrorDialog(locationError);
+      return;
+    }
+
+        setState(() => _isLoading = true);
+
+
+
+  // if (userName.isEmpty ||
+  //     email.isEmpty ||
+  //     password.isEmpty ||
+  //     phoneNumber.isEmpty ||
+  //     birthday.isEmpty ||
+  //     location.isEmpty) {
+  //   _showErrorDialog("Please fill out all fields.");
+  //   return;
+  // }
+
+  // // Check if the country code has exactly 3 characters and the phone number has 10 digits
+  // if (countryCode.length != 3 || !countryCode.startsWith('+')) {
+  //   _showErrorDialog("Country code should be exactly 3 characters and start with '+'.");
+  //   return;
+  // }
+
+  // if (phoneNumber.length != 10) {
+  //   _showErrorDialog("Phone number should be exactly 10 digits.");
+  //   return;
+  // }
+
+  // setState(() => _isLoading = true);
 
   try {
     UserCredential userCredential = await FirebaseAuth.instance
@@ -239,7 +353,7 @@ Future<void> _registerUser() async {
       await _firestoreMethods.saveUserData(
         AppUserModel.User(
           uid: user.uid,
-          fullName: fullName,
+          userName: userName,
           email: email,
           phoneNumber: fullPhoneNumber,
           birthday: birthday,
@@ -350,7 +464,7 @@ Future<void> _registerUser() async {
   }
 
   void _clearTextFields() {
-    _fullNameController.clear();
+    _userNameController.clear();
     _emailController.clear();
     _phoneNumberController.clear();
     _birthdayController.clear();

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
 import 'dart:math' as math;
 
+
 class AudioCallingScreen extends StatefulWidget {
   final String enteredNumber;
   const AudioCallingScreen({Key? key, required this.enteredNumber}) : super(key: key);
@@ -258,8 +259,8 @@ class AudioCallingPage extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: ZegoUIKitPrebuiltCall(
-          appID: 1498346296,
-          appSign: "7266d87faf7143a95d2702f016f39944062ab8c2ea2580ea29c676581a7e87fd",
+          appID: 199803229,
+          appSign: "e257121ab70ee97d0fdaf2ae55258eaab6b37104cddda4ccde79206080d933db",
           userID: userId,
           callID: callingId,
           config: ZegoUIKitPrebuiltCallConfig.oneOnOneVoiceCall()

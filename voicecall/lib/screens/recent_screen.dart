@@ -163,85 +163,108 @@ class _RecentScreenState extends State<RecentScreen> {
     );
   }
 
-  Widget _buildSelectAllCheckbox() {
-    return Row(
-      children: [
-        Checkbox(
-          value: _selectAll,
-          onChanged: (value) {
-            setState(() {
-              _selectAll = value ?? false;
-              for (var contact in recentContacts) {
-                contact['isSelected'] = _selectAll;
-              }
-            });
-          },
-        ),
-        const Text('Select All'),
-      ],
-    );
-  }
-
-  Widget _buildRecentContactsList() {
-    if (recentContacts.isEmpty) {
-      return const Expanded(
-        child: Center(
-          child: Text("No recent contacts."),
-        ),
-      );
-    }
-
-    return Expanded(
-      child: ListView.builder(
-        itemCount: recentContacts.length,
-        itemBuilder: (context, index) {
-          String name = recentContacts[index]['name'] ?? 'Unknown';
-          String number = recentContacts[index]['number'] ?? '';
-          String imageUrl = recentContacts[index]['imageUrl'] ?? '';
-          bool isSelected = recentContacts[index]['isSelected'] ?? false;
-          String status = recentContacts[index]['status'];
-
-          if (_searchQuery.isNotEmpty &&
-              !name.toLowerCase().contains(_searchQuery.toLowerCase())) {
-            return Container();
-          }
-
-          return ListTile(
-            leading: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_isDeleteMode)
-                  Checkbox(
-                    value: isSelected,
-                    onChanged: (value) {
-                      setState(() {
-                        recentContacts[index]['isSelected'] = value ?? false;
-                        _selectAll = recentContacts.every((contact) => contact['isSelected']);
-                      });
-                    },
-                  ),
-                CircleAvatar(
-                  radius: 25,
-                  backgroundImage: imageUrl.isNotEmpty
-                      ? NetworkImage(imageUrl)
-                      : const AssetImage('assets/icon.jpg') as ImageProvider,
-                ),
-              ],
-            ),
-            title: Text(name),
-            subtitle: Text(number),
-            trailing: Icon(
-              status == 'accepted' ? Icons.call_received : Icons.call_made,
-              color: status == 'accepted' ? Colors.green : Colors.blue,
-            ),
-            onTap: () {
-              print('Call details for $name');
+Widget _buildSelectAllCheckbox() {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Row(
+        children: [
+          Checkbox(
+            value: _selectAll,
+            onChanged: (value) {
+              setState(() {
+                _selectAll = value ?? false;
+                for (var contact in recentContacts) {
+                  contact['isSelected'] = _selectAll;
+                }
+              });
             },
-          );
+          ),
+          const Text('Select All'),
+        ],
+      ),
+      TextButton(
+        onPressed: () {
+          setState(() {
+            // Deselect all checkboxes
+            for (var contact in recentContacts) {
+              contact['isSelected'] = false;
+            }
+            _isDeleteMode = false; // Exit delete mode
+            _selectAll = false;    // Reset select-all state
+          });
         },
+        child: const Text(
+          'Cancel',
+          style: TextStyle(color: Colors.red),
+        ),
+      ),
+    ],
+  );
+}
+
+
+Widget _buildRecentContactsList() {
+  List<Map<String, dynamic>> filteredContacts = recentContacts.where((contact) {
+    String name = contact['name']?.toLowerCase() ?? '';
+    String number = contact['number'] ?? '';
+    return name.contains(_searchQuery.toLowerCase()) ||
+        number.contains(_searchQuery);
+  }).toList();
+
+  if (filteredContacts.isEmpty) {
+    return const Expanded(
+      child: Center(
+        child: Text("No contacts found."),
       ),
     );
   }
+
+  return Expanded(
+    child: ListView.builder(
+      itemCount: filteredContacts.length,
+      itemBuilder: (context, index) {
+        String name = filteredContacts[index]['name'] ?? 'Unknown';
+        String number = filteredContacts[index]['number'] ?? '';
+        String imageUrl = filteredContacts[index]['imageUrl'] ?? '';
+        bool isSelected = filteredContacts[index]['isSelected'] ?? false;
+        String status = filteredContacts[index]['status'];
+
+        return ListTile(
+          leading: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_isDeleteMode)
+                Checkbox(
+                  value: isSelected,
+                  onChanged: (value) {
+                    setState(() {
+                      filteredContacts[index]['isSelected'] = value ?? false;
+                      _selectAll = filteredContacts.every((contact) =>
+                          contact['isSelected']); // Update select-all state
+                    });
+                  },
+                ),
+              CircleAvatar(
+                radius: 25,
+                backgroundImage: imageUrl.isNotEmpty
+                    ? NetworkImage(imageUrl)
+                    : const AssetImage('assets/icon.jpg') as ImageProvider,
+              ),
+            ],
+          ),
+          title: Text(name),
+          subtitle: Text(number),
+          trailing: Icon(
+            status == 'accepted' ? Icons.call_received : Icons.call_made,
+            color: status == 'accepted' ? Colors.green : Colors.blue,
+          ),
+        );
+      },
+    ),
+  );
+}
+
 
   // Delete selected recent calls from both the UI and Firebase
   Future<void> _deleteSelectedContacts() async {

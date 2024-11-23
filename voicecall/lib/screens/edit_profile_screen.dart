@@ -35,7 +35,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (doc.exists) {
         var userData = doc.data() as Map<String, dynamic>;
         setState(() {
-          _nameController.text = userData['fullName'] ?? '';
+          _nameController.text = userData['userName'] ?? '';
           _phoneController.text = userData['phoneNumber'] ?? '';
           _birthdayController.text = userData['birthday'] ?? '';
           _locationController.text = userData['location'] ?? '';
@@ -50,13 +50,70 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+   // Validation functions
+  String? _validateuserName(String userName) {
+    if (userName.isEmpty) return "User Name cannot be empty.";
+    if (RegExp(r'^\d+$').hasMatch(userName)) {
+      return "User Name cannot be entirely numbers.";
+    }
+    return null;
+  }
+
+  String? _validateBirthday(String birthday) {
+    if (birthday.isEmpty) return "Birthday cannot be empty.";
+    try {
+      final dateParts = birthday.split('/');
+      final day = int.parse(dateParts[0]);
+      final month = int.parse(dateParts[1]);
+      final year = int.parse(dateParts[2]);
+      DateTime birthDate = DateTime(year, month, day);
+      if (birthDate.isAfter(DateTime.now())) {
+        return "Birthday cannot be in the future.";
+      }
+    } catch (_) {
+      return "Enter a valid date in DD/MM/YYYY format.";
+    }
+    return null;
+  }
+
+  String? _validateLocation(String location) {
+    if (location.isEmpty) return "Location cannot be empty.";
+    if (RegExp(r'^\d+$').hasMatch(location)) {
+      return "Location cannot be entirely numbers.";
+    }
+    return null;
+  }
+
 Future<void> _saveProfile() async {
-  setState(() => _isLoading = true);
+      String userName = _nameController.text.trim();
+    String birthday = _birthdayController.text.trim();
+    String location = _locationController.text.trim();
+
+     String? userNameError = _validateuserName(userName);
+    if (userNameError != null) {
+      _showDialog(userNameError);
+      return;
+    }
+
+    String? birthdayError = _validateBirthday(birthday);
+    if (birthdayError != null) {
+      _showDialog(birthdayError);
+      return;
+    }
+
+    String? locationError = _validateLocation(location);
+    if (locationError != null) {
+      _showDialog(locationError);
+      return;
+    }
+
+        setState(() => _isLoading = true);
+
 
   try {
     // Update user data in Firestore
     Map<String, dynamic> updatedUserData = {
-      'fullName': _nameController.text,
+      'userName': _nameController.text,
       'birthday': _birthdayController.text,
       'location': _locationController.text,
       'phoneNumber': _phoneController.text,  // Include phone number
@@ -85,7 +142,7 @@ Future<void> _saveProfile() async {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Information'),
+        title: const Text('Error'),
         content: Text(message),
         actions: [
           TextButton(
@@ -110,7 +167,7 @@ Future<void> _saveProfile() async {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTextField("Full name", _nameController),
+              _buildTextField("User Name", _nameController),
               const SizedBox(height: 16),
 
               _buildInteractiveTextField(
