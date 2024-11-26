@@ -17,6 +17,36 @@ class KeypadScreen extends StatefulWidget {
 
 class _KeypadScreenState extends State<KeypadScreen> {
   String _enteredNumber = "";
+  List<Map<String, dynamic>> _contacts = []; // Store user's contacts
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserContacts(); // Fetch contacts when the screen is initialized
+  }
+
+  // Fetch user's contacts from Firestore
+  Future<void> _fetchUserContacts() async {
+    String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    try {
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (userDoc.exists) {
+        List<dynamic> contacts = userDoc['contacts'] ?? [];
+        setState(() {
+          _contacts = contacts.map((e) => Map<String, dynamic>.from(e)).toList();
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to fetch contacts.')),
+      );
+    }
+  }
 
   // Add digit to the entered number
   void _addDigit(String digit) {
@@ -34,8 +64,13 @@ class _KeypadScreenState extends State<KeypadScreen> {
     }
   }
 
-  // Show Bottom Sheet with Contact Options
+  // Validate phone number format
+  bool _isValidPhoneNumber(String phoneNumber) {
+    final regex = RegExp(r'^\+?[0-9]{10,15}$');
+    return regex.hasMatch(phoneNumber);
+  }
 
+  // Show Bottom Sheet with Contact Options
   Future<void> _showAddContactOptions() async {
     if (_enteredNumber.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -44,21 +79,15 @@ class _KeypadScreenState extends State<KeypadScreen> {
       return;
     }
 
-    String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-
     // Check if contact already exists
-      final querySnapshot = await FirebaseFirestore.instance
-      .collection('contacts')
-      .where('userId', isEqualTo: userId) // Filter by userId
-      .where('phone', isEqualTo: _enteredNumber)
-      .get();
+    bool contactExists = _contacts.any((contact) =>
+        contact['phone'] != null && contact['phone'] == _enteredNumber);
 
-    if (querySnapshot.docs.isNotEmpty) {
-      // Contact exists, show message and navigate to update existing contact
+    if (contactExists) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('This contact already exists.')),
       );
-      _navigateToContactProfileScreen(); // Navigate to update existing contact screen
+      _navigateToContactProfileScreen();
       return;
     }
 
@@ -70,23 +99,23 @@ class _KeypadScreenState extends State<KeypadScreen> {
       builder: (context) {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          height: 250, // Set height to increase the size of the bottom sheet
+          height: 250,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                "Add to Contacts", // Title at the top of the bottom sheet
+                "Add to Contacts",
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 20), // Space between title and options
+              const SizedBox(height: 20),
               ListTile(
                 leading: const Icon(Icons.person_add, color: Colors.blue),
                 title: const Text('Create New Contact'),
                 onTap: () {
-                  Navigator.pop(context); // Close bottom sheet
+                  Navigator.pop(context);
                   _navigateToNewContactScreen();
                 },
               ),
@@ -94,7 +123,7 @@ class _KeypadScreenState extends State<KeypadScreen> {
                 leading: const Icon(Icons.edit, color: Colors.green),
                 title: const Text('Update Existing Contact'),
                 onTap: () {
-                  Navigator.pop(context); // Close bottom sheet
+                  Navigator.pop(context);
                   _navigateToContactProfileScreen();
                 },
               ),
@@ -115,33 +144,24 @@ class _KeypadScreenState extends State<KeypadScreen> {
     );
   }
 
-  // Navigate to Contact Profile Screen (Pass Example Data for Now)
-  void _navigateToContactProfileScreen() async {
+  // Navigate to Contact Profile Screen
+  void _navigateToContactProfileScreen() {
+    Map<String, dynamic>? contact = _contacts.firstWhere(
+      (contact) => contact['phone'] == _enteredNumber,
+      orElse: () => {}, // Return an empty map if no match is found
+    );
 
-    String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-     // Check if contact exists for the current user
-  final querySnapshot = await FirebaseFirestore.instance
-      .collection('contacts')
-      .where('userId', isEqualTo: userId) // Filter by userId
-      .where('phone', isEqualTo: _enteredNumber)
-      .get();
-
-    if (querySnapshot.docs.isEmpty) {
-      // If no contact is found, prompt to create a new contact
+    if (contact.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text('Contact not found. Create a new contact.')),
       );
-      _navigateToNewContactScreen(); // Navigate to create new contact
+      _navigateToNewContactScreen();
     } else {
-      // If contact exists, navigate to ContactProfileScreen
-      final contactData = querySnapshot.docs.first.data();
-      contactData['id'] = querySnapshot.docs.first.id; // Add document ID
-
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ContactProfileScreen(contact: contactData),
+          builder: (context) => ContactProfileScreen(contact: contact),
         ),
       );
     }
@@ -171,12 +191,11 @@ class _KeypadScreenState extends State<KeypadScreen> {
     );
   }
 
-  // Add to Contacts Button
   Widget _buildAddContactButton() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: ElevatedButton(
-        onPressed: _showAddContactOptions, // Show bottom sheet with options
+        onPressed: _showAddContactOptions,
         style: ElevatedButton.styleFrom(
           foregroundColor: Colors.white,
           backgroundColor: Colors.blue,
@@ -191,7 +210,6 @@ class _KeypadScreenState extends State<KeypadScreen> {
     );
   }
 
-  // Display the Entered Number
   Widget _buildEnteredNumberDisplay() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -203,14 +221,14 @@ class _KeypadScreenState extends State<KeypadScreen> {
       child: Text(
         _enteredNumber.isEmpty ? "Enter number" : _enteredNumber,
         style: const TextStyle(
-            fontSize: 35,
-            fontWeight: FontWeight.bold,
-            color: Color.fromARGB(255, 16, 16, 16)),
+          fontSize: 35,
+          fontWeight: FontWeight.bold,
+          color: Color.fromARGB(255, 16, 16, 16),
+        ),
       ),
     );
   }
 
-  // Number Pad (1-9, *, 0, #)
   Widget _buildNumberPad() {
     List<String> digits = [
       '1',
@@ -254,9 +272,10 @@ class _KeypadScreenState extends State<KeypadScreen> {
                 child: Text(
                   digit,
                   style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white),
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -266,7 +285,6 @@ class _KeypadScreenState extends State<KeypadScreen> {
     );
   }
 
-  // Call and Delete Buttons// Call and Delete Buttons
   Widget _buildCallAndDeleteButtons() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -275,7 +293,7 @@ class _KeypadScreenState extends State<KeypadScreen> {
           color: Colors.green,
           icon: Icons.call,
           onTap: () {
-            if (_enteredNumber.isNotEmpty) {
+            if (_enteredNumber.isNotEmpty && _isValidPhoneNumber(_enteredNumber)) {
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -285,7 +303,7 @@ class _KeypadScreenState extends State<KeypadScreen> {
               );
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please enter a phone number.')),
+                const SnackBar(content: Text('Please enter a valid phone number.')),
               );
             }
           },
@@ -299,7 +317,6 @@ class _KeypadScreenState extends State<KeypadScreen> {
     );
   }
 
-  // Reusable Circle Button Widget
   Widget _buildCircleButton({
     required Color color,
     required IconData icon,
@@ -329,7 +346,6 @@ class _KeypadScreenState extends State<KeypadScreen> {
     );
   }
 
-  // Options Menu for Profile and Translations
   void _showOptionsMenu(BuildContext context) async {
     await showMenu(
       color: const Color.fromARGB(255, 39, 196, 159),
