@@ -285,37 +285,104 @@ class _KeypadScreenState extends State<KeypadScreen> {
     );
   }
 
-  Widget _buildCallAndDeleteButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _buildCircleButton(
-          color: Colors.green,
-          icon: Icons.call,
-          onTap: () {
-            if (_enteredNumber.isNotEmpty && _isValidPhoneNumber(_enteredNumber)) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      AudioCallingScreen(enteredNumber: _enteredNumber),
-                ),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please enter a valid phone number.')),
-              );
-            }
-          },
+void _initiateCall() async {
+  if (_enteredNumber.isEmpty || !_isValidPhoneNumber(_enteredNumber)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please enter a valid phone number.')),
+    );
+    return;
+  }
+
+  try {
+    // Check if the recipient exists by phone number
+    QuerySnapshot userQuery = await FirebaseFirestore.instance
+        .collection('users')
+        .where('user_details.phoneNumber', isEqualTo: _enteredNumber)
+        .limit(1)
+        .get();
+
+    if (userQuery.docs.isEmpty) {
+      // Recipient does not exist
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User with this phone number does not exist.')),
+      );
+      return;
+    }
+
+    // Retrieve current user and recipient details
+    // String currentUserUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    Future<String> _getCallerPhoneNumber(String uid) async {
+      try {
+        DocumentSnapshot userDoc =
+            await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+        if (userDoc.exists) {
+          return userDoc['user_details']['phoneNumber'] ?? 'Unknown';
+        }
+      } catch (e) {
+        print('Error fetching caller phone number: $e');
+      }
+      return 'Unknown';
+    }
+
+    String currentUserUid = FirebaseAuth.instance.currentUser!.uid;
+    String callerPhoneNumber = await _getCallerPhoneNumber(currentUserUid);
+
+    String recipientUid = userQuery.docs.first.id;
+    String recipientPhoneNumber = _enteredNumber;
+
+    // Create a new document in the 'ongoingCalls' collection
+    String callId = FirebaseFirestore.instance.collection('ongoingCalls').doc().id;
+
+    await FirebaseFirestore.instance.collection('ongoingCalls').doc(callId).set({
+      'callerUid': currentUserUid,
+      'callerPhoneNumber': callerPhoneNumber,
+      'acceptorUid': recipientUid,
+      'acceptorPhoneNumber': recipientPhoneNumber,
+      'callId': callId,
+      'status': 'placed',
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+
+    // Navigate to the call screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AudioCallingScreen(
+          enteredNumber: _enteredNumber,
+          recipientUid: recipientUid,
+          callId: callId,
         ),
-        _buildCircleButton(
-          color: Colors.red,
-          icon: Icons.backspace,
-          onTap: _deleteLastDigit,
-        ),
-      ],
+      ),
+    );
+  } catch (e) {
+    print('Error initiating call: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Failed to initiate call. Please try again.')),
     );
   }
+}
+
+
+// Replace the `_buildCircleButton` for the call button
+Widget _buildCallAndDeleteButtons() {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    children: [
+      _buildCircleButton(
+        color: Colors.green,
+        icon: Icons.call,
+        onTap: _initiateCall,
+      ),
+      _buildCircleButton(
+        color: Colors.red,
+        icon: Icons.backspace,
+        onTap: _deleteLastDigit,
+      ),
+    ],
+  );
+}
+
 
   Widget _buildCircleButton({
     required Color color,
