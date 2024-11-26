@@ -6,7 +6,12 @@ class FirestoreMethods {
 
   Future<void> saveUserData(AppUserModel.User user) async {
     try {
-      await _firestore.collection('users').doc(user.uid).set(user.toMap());
+      await _firestore.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'user_details': user.userDetails,
+        'contacts': [],
+        'callLogs': [],
+      });
     } catch (e) {
       print('Failed to save user data: $e');
       rethrow; // Rethrow to catch the error in the UI layer
