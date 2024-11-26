@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:vibration/vibration.dart';
 import 'package:voicecall/screens/incoming_call_screen.dart';
 
 class CallListenerService {
@@ -15,6 +16,10 @@ class CallListenerService {
           .snapshots()
           .listen((snapshot) {
         for (var doc in snapshot.docs) {
+          // Trigger vibration for incoming call
+          _triggerVibration();
+
+          // Navigate to IncomingCallScreen
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => IncomingCallScreen(callData: doc.data(), callId: doc.id),
@@ -23,5 +28,13 @@ class CallListenerService {
         }
       });
     }
+  }
+
+  static void _triggerVibration() {
+    Vibration.hasVibrator().then((bool? hasVibrator) {
+      if (hasVibrator == true) {
+        Vibration.vibrate(pattern: [0, 500, 1000, 500, 1000], repeat: 1);
+      }
+    });
   }
 }

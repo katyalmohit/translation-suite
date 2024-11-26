@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:vibration/vibration.dart';
 import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
 
 class IncomingCallScreen extends StatelessWidget {
@@ -36,6 +37,11 @@ class IncomingCallScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                   ),
                   onPressed: () async {
+                    // Stop vibration
+                    if (await Vibration.hasVibrator() ?? false) {
+                      Vibration.cancel();
+                    }
+
                     // Accept the call: update status
                     await FirebaseFirestore.instance
                         .collection('ongoingCalls')
@@ -52,15 +58,12 @@ class IncomingCallScreen extends StatelessWidget {
                           userID: callData['acceptorUid'],
                           callID: callId,
                           config: ZegoUIKitPrebuiltCallConfig.oneOnOneVideoCall()
-                            // ..onOnlySelfInRoom = (context) {
-                            //   Navigator.pop(context);
-                            // }, /// support minimizing
-          ..topMenuBar.isVisible = true
-          ..topMenuBar.buttons = [
-            ZegoCallMenuBarButtonName.minimizingButton,
-            ZegoCallMenuBarButtonName.showMemberListButton,
-            ZegoCallMenuBarButtonName.soundEffectButton,
-          ],
+                            ..topMenuBar.isVisible = true
+                            ..topMenuBar.buttons = [
+                              ZegoCallMenuBarButtonName.minimizingButton,
+                              ZegoCallMenuBarButtonName.showMemberListButton,
+                              ZegoCallMenuBarButtonName.soundEffectButton,
+                            ],
                           userName: 'Acceptor',
                         ),
                       ),
@@ -74,6 +77,11 @@ class IncomingCallScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                   ),
                   onPressed: () async {
+                    // Stop vibration
+                    if (await Vibration.hasVibrator() ?? false) {
+                      Vibration.cancel();
+                    }
+
                     // Decline the call: update status
                     await FirebaseFirestore.instance
                         .collection('ongoingCalls')
@@ -96,6 +104,3 @@ class IncomingCallScreen extends StatelessWidget {
     );
   }
 }
-// extension on ZegoUIKitPrebuiltCallConfig {
-//   set onOnlySelfInRoom(Null Function(dynamic context) onOnlySelfInRoom) {}
-// }
