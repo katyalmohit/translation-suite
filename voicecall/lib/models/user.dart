@@ -1,39 +1,32 @@
 class User {
   final String uid;
-  final String userName;
-  final String email;
-  final String phoneNumber;
-  final String birthday;
-  final String location;
+  final Map<String, dynamic> userDetails;
+  final List<Map<String, dynamic>> contacts;
+  final List<Map<String, dynamic>> callLogs;
 
   User({
     required this.uid,
-    required this.userName,
-    required this.email,
-    required this.phoneNumber,
-    required this.birthday,
-    required this.location,
+    required this.userDetails,
+    this.contacts = const [],
+    this.callLogs = const [],
+
   });
 
   Map<String, dynamic> toMap() {
     return {
       'uid': uid,
-      'userName': userName,
-      'email': email,
-      'phoneNumber': phoneNumber,
-      'birthday': birthday,
-      'location': location,
+      'userDetails': userDetails,
+      'contacts': contacts,
+      'callLogs': callLogs,
     };
   }
 
   factory User.fromMap(Map<String, dynamic> map) {
     return User(
       uid: map['uid'] ?? '',
-      userName: map['userName'] ?? '',
-      email: map['email'] ?? '',
-      phoneNumber: map['phoneNumber'] ?? '',
-      birthday: map['birthday'] ?? '',
-      location: map['location'] ?? '',
+      userDetails: map['userDetails']?? {},
+      contacts: List<Map<String, dynamic>>.from(map['contacts'] ?? []),
+      callLogs: List<Map<String, dynamic>>.from(map['callLogs'] ?? []),
     );
   }
 }
