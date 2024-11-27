@@ -353,11 +353,13 @@ Future<void> _registerUser() async {
       await _firestoreMethods.saveUserData(
         AppUserModel.User(
           uid: user.uid,
-          userName: userName,
-          email: email,
-          phoneNumber: fullPhoneNumber,
-          birthday: birthday,
-          location: location,
+          userDetails: {
+            'username':userName,
+            'email': email,
+            'phoneNumber': phoneNumber,
+            'birthday': birthday,
+            'location': location,
+          }
         ),
       );
 

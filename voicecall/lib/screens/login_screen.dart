@@ -48,6 +48,8 @@ Future<void> _loginUser() async {
     if (user != null) {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       bool isPhoneVerified = prefs.getBool('isPhoneVerified') ?? false;
+      // SharedPreferences prefs = await SharedPreferences.getInstance();
+      // await prefs.setBool('isPhoneVerified', true); // Set this after successful phone verification
 
       if (!user.emailVerified) {
         _showVerificationDialog(user, type: "email");

@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../widgets/back_app_bar.dart'; // Import custom app bar
+import '../widgets/back_app_bar.dart';
 
 class NewContactScreen extends StatefulWidget {
-  final String phoneNumber; // Accept phone number from KeypadScreen
+  final String phoneNumber;
 
   const NewContactScreen({super.key, required this.phoneNumber});
 
@@ -44,14 +44,14 @@ class _NewContactScreenState extends State<NewContactScreen> {
 
   String? _validatePhoneNumber(String phone) {
     if (phone.isEmpty) return "Phone number cannot be empty.";
-    if (phone.length > 12 || !RegExp(r'^\d+$').hasMatch(phone)) {
-      return "Phone number should be exactly 10 digits.";
+    if (phone.length > 15 || !RegExp(r'^\+?[0-9]+$').hasMatch(phone)) {
+      return "Enter a valid phone number.";
     }
     return null;
   }
 
   String? _validateEmail(String email) {
-    if (email.isEmpty) return null; // Optional field, no error if empty
+    if (email.isEmpty) return null; // Optional field
     if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w]{2,4}$').hasMatch(email)) {
       return "Enter a valid email address.";
     }
@@ -72,15 +72,13 @@ class _NewContactScreenState extends State<NewContactScreen> {
     setState(() {}); // Refresh UI with selected image
   }
 
-  // Function to save contact to Firestore with duplicate check
-// Function to save contact to Firestore with duplicate check and loading indicator
   Future<void> _saveContact() async {
     String name = _nameController.text.trim();
     String phone = _phoneController.text.trim();
     String email = _emailController.text.trim();
     String location = _locationController.text.trim();
 
-    // Validate fields sequentially and show first error found
+    // Validate fields sequentially
     String? nameError = _validateName(name);
     if (nameError != null) {
       _showErrorDialog(nameError);
@@ -105,14 +103,7 @@ class _NewContactScreenState extends State<NewContactScreen> {
       return;
     }
 
-    // if (_nameController.text.isEmpty || _phoneController.text.isEmpty) {
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     const SnackBar(content: Text('Name and Phone number are required.')),
-    //   );
-    //   return;
-    // }
-
-    setState(() => _isSaving = true); // Show loading spinner
+    setState(() => _isSaving = true); // Start saving
 
     // Show loading dialog
     showDialog(
@@ -124,7 +115,7 @@ class _NewContactScreenState extends State<NewContactScreen> {
             children: [
               CircularProgressIndicator(),
               SizedBox(width: 20),
-              Expanded(child: Text("Adding contact...")),
+              Expanded(child: Text("Saving contact...")),
             ],
           ),
         );
@@ -133,27 +124,9 @@ class _NewContactScreenState extends State<NewContactScreen> {
 
     try {
       String userId = _currentUser?.uid ?? '';
-      String phoneNumber = _phoneController.text.trim();
-
-      // Check if contact with the same phone number already exists for this user
-      final QuerySnapshot existingContact = await _firestore
-          .collection('contacts')
-          .where('userId', isEqualTo: userId)
-          .where('phone', isEqualTo: phoneNumber)
-          .limit(1)
-          .get();
-
-      if (existingContact.docs.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This contact already exists.')),
-        );
-        setState(() => _isSaving = false); // Stop loading spinner
-        return;
-      }
-
       String? imageUrl;
 
-      // If image is selected, upload it to Firebase Storage
+      // If an image is selected, upload it to Firebase Storage
       if (_image != null) {
         final ref = FirebaseStorage.instance.ref().child(
             'contacts/$userId/${DateTime.now().millisecondsSinceEpoch}.jpg');
@@ -161,18 +134,24 @@ class _NewContactScreenState extends State<NewContactScreen> {
         imageUrl = await ref.getDownloadURL();
       }
 
-      // Create a new contact document in Firestore
-      await _firestore.collection('contacts').add({
-        'name': _nameController.text,
-        'phone': phoneNumber,
-        'email':
-            _emailController.text.isNotEmpty ? _emailController.text : null,
-        'location': _locationController.text.isNotEmpty
-            ? _locationController.text
-            : null,
+      // Generate a unique contact ID
+      String contactId = _firestore.collection('users').doc().id;
+
+      // Prepare new contact data
+      Map<String, dynamic> newContact = {
+        'contactId': contactId, // Unique identifier for this contact
+        'name': name,
+        'phone': phone,
+        'email': email.isNotEmpty ? email : null,
+        'location': location.isNotEmpty ? location : null,
         'imageUrl': imageUrl,
-        'userId': userId,
-        'createdAt': FieldValue.serverTimestamp(),
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+
+      // Update the `contacts` list in the user's document
+      DocumentReference userDoc = _firestore.collection('users').doc(userId);
+      await userDoc.update({
+        'contacts': FieldValue.arrayUnion([newContact]),
       });
 
       Navigator.pop(context); // Close loading dialog
@@ -188,7 +167,7 @@ class _NewContactScreenState extends State<NewContactScreen> {
         const SnackBar(content: Text('Failed to save contact.')),
       );
     } finally {
-      setState(() => _isSaving = false); // Stop loading spinner
+      setState(() => _isSaving = false); // Stop saving
     }
   }
 
@@ -237,9 +216,6 @@ class _NewContactScreenState extends State<NewContactScreen> {
                   _buildButton("Save", _saveContact, Colors.blue),
                 ],
               ),
-              if (_isSaving)
-                const Center(
-                    child: CircularProgressIndicator()), // Show spinner
             ],
           ),
         ),
@@ -283,20 +259,20 @@ class _NewContactScreenState extends State<NewContactScreen> {
       child: Text(label),
     );
   }
-  
-void _showErrorDialog(String message) {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Error'),
-      content: Text(message),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('OK'),
-        ),
-      ],
-    ),
-  );
-}
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
 }

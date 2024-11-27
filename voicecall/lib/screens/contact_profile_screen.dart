@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -17,6 +18,7 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final ImagePicker _picker = ImagePicker();
+  final String? userId = FirebaseAuth.instance.currentUser?.uid;
 
   bool _isEditing = false;
   bool _isSaving = false; // Track the saving/loading state
@@ -32,7 +34,8 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
     _nameController = TextEditingController(text: widget.contact['name']);
     _phoneController = TextEditingController(text: widget.contact['phone']);
     _emailController = TextEditingController(text: widget.contact['email']);
-    _locationController = TextEditingController(text: widget.contact['location']);
+    _locationController =
+        TextEditingController(text: widget.contact['location']);
   }
 
   @override
@@ -59,7 +62,7 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
     try {
       final ref = _storage
           .ref()
-          .child('contacts/${widget.contact['id']}/${DateTime.now()}.jpg');
+          .child('contacts/$userId/${DateTime.now().millisecondsSinceEpoch}.jpg');
       await ref.putFile(_newImageFile!);
       return await ref.getDownloadURL();
     } catch (e) {
@@ -139,22 +142,35 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
     }
 
     try {
-      await _firestore.collection('contacts').doc(widget.contact['id']).update({
-        'name': _nameController.text,
-        'phone': _phoneController.text,
-        'email': _emailController.text,
-        'location': _locationController.text,
-        'imageUrl': imageUrl,
-      });
+      final userDoc = _firestore.collection('users').doc(userId);
+      final userSnapshot = await userDoc.get();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Contact updated successfully!')),
-      );
+      if (userSnapshot.exists) {
+        List<dynamic> contacts = userSnapshot['contacts'] ?? [];
+        int contactIndex = contacts.indexWhere(
+            (contact) => contact['phone'] == widget.contact['phone']);
 
-      setState(() {
-        _isEditing = false;
-        _isSaving = false; // Hide loading indicator
-      });
+        if (contactIndex != -1) {
+          contacts[contactIndex] = {
+            'name': name,
+            'phone': phone,
+            'email': email,
+            'location': location,
+            'imageUrl': imageUrl,
+          };
+
+          await userDoc.update({'contacts': contacts});
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Contact updated successfully!')),
+          );
+
+          setState(() {
+            _isEditing = false;
+            _isSaving = false; // Hide loading indicator
+          });
+        }
+      }
     } catch (e) {
       print('Failed to update contact: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -208,7 +224,7 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
       ),
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(), // Dismiss the keyboard on tap
-        child: SingleChildScrollView( // Prevents overflow issues
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
@@ -248,7 +264,7 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
                     padding: EdgeInsets.all(20.0),
                     child: CircularProgressIndicator(),
                   ),
-                ), // Show loading spinner
+                ),
             ],
           ),
         ),
@@ -262,22 +278,22 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
       controller: controller,
       enabled: _isEditing,
       style: const TextStyle(
-        color: Color.fromARGB(124, 0, 0, 0), // Change the text color to black (or any color)
-        fontSize: 18, // Optional: Increase font size for better visibility
-        fontWeight: FontWeight.w500, // Optional: Adjust font weight
+        color: Colors.black,
+        fontSize: 18,
+        fontWeight: FontWeight.w500,
       ),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(
-          color: Colors.grey, // Change the label text color
-          fontWeight: FontWeight.bold, // Optional: Bold label
+          color: Colors.grey,
+          fontWeight: FontWeight.bold,
         ),
         prefixIcon: Icon(icon, color: Colors.indigo),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-        filled: true, // Add fill color for better visibility
-        fillColor: const Color.fromARGB(255, 230, 230, 250), // Light background color
+        filled: true,
+        fillColor: const Color.fromARGB(255, 230, 230, 250),
       ),
     );
   }
