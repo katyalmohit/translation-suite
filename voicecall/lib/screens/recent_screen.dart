@@ -27,7 +27,6 @@ class _RecentScreenState extends State<RecentScreen> {
     _fetchRecentCalls();
   }
 
-  // Fetch recent calls and display in the UI
   Future<void> _fetchRecentCalls() async {
     setState(() {
       _isLoading = true;
@@ -45,55 +44,44 @@ class _RecentScreenState extends State<RecentScreen> {
         return;
       }
 
-      final recentCallsSnapshot = await _firestore
-          .collection('recents')
-          .where('userId', isEqualTo: userId)
-          .get();
+      // Fetch recent calls from the user's callLogs
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+
+      if (!userDoc.exists) {
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      var userData = userDoc.data() as Map<String, dynamic>;
+      List<dynamic> callLogs = userData['callLogs'] ?? [];
 
       List<Map<String, dynamic>> fetchedRecentContacts = [];
 
-      for (var doc in recentCallsSnapshot.docs) {
-        Map<String, dynamic> recentCallData = doc.data();
-        String calledNumber = recentCallData['calledNumber'] ?? 'Unknown';
-        String acceptorUid = recentCallData['acceptorUid'] ?? '';
-        String callerUid = recentCallData['callerUid'] ?? '';
+      for (var callLog in callLogs) {
+        String dialedNumber = callLog['phoneNumber'] ?? 'Unknown';
 
-        // Log call for both users
-        await _logCallForUsers(callerUid, acceptorUid, recentCallData);
+        // Check if the dialed number exists in the user's contacts
+        var contact = (userData['contacts'] ?? []).firstWhere(
+          (contact) => contact['phone'] == dialedNumber,
+          orElse: () => null,
+        );
 
-        // Check if contact exists in the current user's 'contacts' collection
-        final contactSnapshot = await _firestore
-            .collection('contacts')
-            .where('userId', isEqualTo: userId) // Filter by current user
-            .where('phone', isEqualTo: calledNumber)
-            .limit(1)
-            .get();
+        String name = contact != null ? contact['name'] ?? 'Unknown' : 'Unknown';
 
-        if (contactSnapshot.docs.isNotEmpty) {
-          var contactData = contactSnapshot.docs.first.data();
-          fetchedRecentContacts.add({
-            'id': doc.id, // Firebase document ID for deletion
-            'name': contactData['name'] ?? 'Unknown',
-            'number': calledNumber,
-            'imageUrl': contactData['imageUrl'] ?? '',
-            'status': recentCallData['status'] ?? 'placed',
-            'isSelected': false,
-          });
-        } else {
-          fetchedRecentContacts.add({
-            'id': doc.id,
-            'name': 'Unknown',
-            'number': calledNumber,
-            'imageUrl': '',
-            'status': recentCallData['status'] ?? 'placed',
-            'isSelected': false,
-          });
-        }
+        fetchedRecentContacts.add({
+          'name': name,
+          'number': dialedNumber,
+          'status': callLog['status'] ?? 'Unknown',
+          'timestamp': callLog['timestamp'] ?? '',
+          'isSelected': false,
+        });
       }
 
       setState(() {
         recentContacts = fetchedRecentContacts;
-        _isLoading = false; // Set loading state to false once data is fetched
+        _isLoading = false;
       });
     } catch (e) {
       print('Error fetching recent calls: $e');
@@ -103,30 +91,6 @@ class _RecentScreenState extends State<RecentScreen> {
       setState(() {
         _isLoading = false;
       });
-    }
-  }
-
-  Future<void> _logCallForUsers(String callerUid, String acceptorUid, Map<String, dynamic> callData) async {
-    try {
-      // Add call log for the caller
-      await _firestore.collection('users').doc(callerUid).collection('callLogs').add({
-        'callerUid': callData['callerUid'],
-        'acceptorUid': callData['acceptorUid'],
-        'status': callData['status'],
-        'timestamp': callData['timestamp'],
-        'duration': FieldValue.serverTimestamp(), // Placeholder for duration
-      });
-
-      // Add call log for the acceptor
-      await _firestore.collection('users').doc(acceptorUid).collection('callLogs').add({
-        'callerUid': callData['callerUid'],
-        'acceptorUid': callData['acceptorUid'],
-        'status': callData['status'],
-        'timestamp': callData['timestamp'],
-        'duration': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      print('Error logging call for users: $e');
     }
   }
 
@@ -215,12 +179,11 @@ class _RecentScreenState extends State<RecentScreen> {
         TextButton(
           onPressed: () {
             setState(() {
-              // Deselect all checkboxes
               for (var contact in recentContacts) {
                 contact['isSelected'] = false;
               }
-              _isDeleteMode = false; // Exit delete mode
-              _selectAll = false; // Reset select-all state
+              _isDeleteMode = false;
+              _selectAll = false;
             });
           },
           child: const Text(
@@ -253,35 +216,12 @@ class _RecentScreenState extends State<RecentScreen> {
         itemBuilder: (context, index) {
           String name = filteredContacts[index]['name'] ?? 'Unknown';
           String number = filteredContacts[index]['number'] ?? '';
-          String imageUrl = filteredContacts[index]['imageUrl'] ?? '';
-          bool isSelected = filteredContacts[index]['isSelected'] ?? false;
           String status = filteredContacts[index]['status'];
+          Timestamp timestamp = filteredContacts[index]['timestamp'];
 
           return ListTile(
-            leading: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_isDeleteMode)
-                  Checkbox(
-                    value: isSelected,
-                    onChanged: (value) {
-                      setState(() {
-                        filteredContacts[index]['isSelected'] = value ?? false;
-                        _selectAll = filteredContacts
-                            .every((contact) => contact['isSelected']); // Update select-all state
-                      });
-                    },
-                  ),
-                CircleAvatar(
-                  radius: 25,
-                  backgroundImage: imageUrl.isNotEmpty
-                      ? NetworkImage(imageUrl)
-                      : const AssetImage('assets/icon.jpg') as ImageProvider,
-                ),
-              ],
-            ),
             title: Text(name),
-            subtitle: Text(number),
+            subtitle: Text('$number\n${timestamp.toDate()}'),
             trailing: Icon(
               status == 'accepted' ? Icons.call_received : Icons.call_made,
               color: status == 'accepted' ? Colors.green : Colors.blue,
@@ -300,13 +240,11 @@ class _RecentScreenState extends State<RecentScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Deleting contact(s)...')),
-    );
-
     try {
       for (var contact in recentContacts.where((c) => c['isSelected'])) {
-        await _firestore.collection('recents').doc(contact['id']).delete();
+        await _firestore.collection('users').doc(userId).update({
+          'callLogs': FieldValue.arrayRemove([contact]),
+        });
       }
 
       setState(() {
@@ -339,15 +277,9 @@ class _RecentScreenState extends State<RecentScreen> {
     ).then((value) {
       switch (value) {
         case 'delete':
-          if (recentContacts.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('No recent contacts to delete')),
-            );
-          } else {
-            setState(() {
-              _isDeleteMode = true;
-            });
-          }
+          setState(() {
+            _isDeleteMode = true;
+          });
           break;
         case 'profile':
           Navigator.push(
