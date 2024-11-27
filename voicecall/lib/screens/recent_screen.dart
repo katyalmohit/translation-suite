@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:timeago/timeago.dart' as timeago; // Import the timeago package
 import 'package:voicecall/screens/profile_screen.dart';
 import '../widgets/custom_app_bar.dart';
 
@@ -220,8 +221,11 @@ class _RecentScreenState extends State<RecentScreen> {
           Timestamp timestamp = filteredContacts[index]['timestamp'];
 
           return ListTile(
+            leading: CircleAvatar(
+              backgroundImage: AssetImage('assets/icon.jpg'), // Default image
+            ),
             title: Text(name),
-            subtitle: Text('$number\n${timestamp.toDate()}'),
+            subtitle: Text('$number\n${timeago.format(timestamp.toDate())}'), // Format the timestamp using timeago
             trailing: Icon(
               status == 'accepted' ? Icons.call_received : Icons.call_made,
               color: status == 'accepted' ? Colors.green : Colors.blue,
@@ -239,6 +243,11 @@ class _RecentScreenState extends State<RecentScreen> {
       );
       return;
     }
+
+    // Show a "deleting contacts" snackbar before starting the delete operation
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Deleting selected contacts...')),
+    );
 
     try {
       for (var contact in recentContacts.where((c) => c['isSelected'])) {
