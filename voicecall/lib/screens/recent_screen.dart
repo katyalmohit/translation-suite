@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:voicecall/screens/profile_screen.dart';
-import 'package:voicecall/translations/translation_screen.dart';
 import '../widgets/custom_app_bar.dart';
 
 class RecentScreen extends StatefulWidget {
@@ -56,6 +55,11 @@ class _RecentScreenState extends State<RecentScreen> {
       for (var doc in recentCallsSnapshot.docs) {
         Map<String, dynamic> recentCallData = doc.data();
         String calledNumber = recentCallData['calledNumber'] ?? 'Unknown';
+        String acceptorUid = recentCallData['acceptorUid'] ?? '';
+        String callerUid = recentCallData['callerUid'] ?? '';
+
+        // Log call for both users
+        await _logCallForUsers(callerUid, acceptorUid, recentCallData);
 
         // Check if contact exists in the current user's 'contacts' collection
         final contactSnapshot = await _firestore
@@ -102,6 +106,30 @@ class _RecentScreenState extends State<RecentScreen> {
     }
   }
 
+  Future<void> _logCallForUsers(String callerUid, String acceptorUid, Map<String, dynamic> callData) async {
+    try {
+      // Add call log for the caller
+      await _firestore.collection('users').doc(callerUid).collection('callLogs').add({
+        'callerUid': callData['callerUid'],
+        'acceptorUid': callData['acceptorUid'],
+        'status': callData['status'],
+        'timestamp': callData['timestamp'],
+        'duration': FieldValue.serverTimestamp(), // Placeholder for duration
+      });
+
+      // Add call log for the acceptor
+      await _firestore.collection('users').doc(acceptorUid).collection('callLogs').add({
+        'callerUid': callData['callerUid'],
+        'acceptorUid': callData['acceptorUid'],
+        'status': callData['status'],
+        'timestamp': callData['timestamp'],
+        'duration': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error logging call for users: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -129,13 +157,14 @@ class _RecentScreenState extends State<RecentScreen> {
                   _buildRecentContactsList(),
                 ],
               ),
-              floatingActionButton: _isDeleteMode && recentContacts.any((contact) => contact['isSelected'])
-          ? FloatingActionButton(
-              onPressed: _deleteSelectedContacts,
-              backgroundColor: Colors.red,
-              child: const Icon(Icons.delete, color: Colors.white),
-            )
-          : null,
+        floatingActionButton: _isDeleteMode &&
+                recentContacts.any((contact) => contact['isSelected'])
+            ? FloatingActionButton(
+                onPressed: _deleteSelectedContacts,
+                backgroundColor: Colors.red,
+                child: const Icon(Icons.delete, color: Colors.white),
+              )
+            : null,
       ),
     );
   }
@@ -163,110 +192,106 @@ class _RecentScreenState extends State<RecentScreen> {
     );
   }
 
-Widget _buildSelectAllCheckbox() {
-  return Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Row(
-        children: [
-          Checkbox(
-            value: _selectAll,
-            onChanged: (value) {
-              setState(() {
-                _selectAll = value ?? false;
-                for (var contact in recentContacts) {
-                  contact['isSelected'] = _selectAll;
-                }
-              });
-            },
-          ),
-          const Text('Select All'),
-        ],
-      ),
-      TextButton(
-        onPressed: () {
-          setState(() {
-            // Deselect all checkboxes
-            for (var contact in recentContacts) {
-              contact['isSelected'] = false;
-            }
-            _isDeleteMode = false; // Exit delete mode
-            _selectAll = false;    // Reset select-all state
-          });
-        },
-        child: const Text(
-          'Cancel',
-          style: TextStyle(color: Colors.red),
+  Widget _buildSelectAllCheckbox() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Checkbox(
+              value: _selectAll,
+              onChanged: (value) {
+                setState(() {
+                  _selectAll = value ?? false;
+                  for (var contact in recentContacts) {
+                    contact['isSelected'] = _selectAll;
+                  }
+                });
+              },
+            ),
+            const Text('Select All'),
+          ],
         ),
-      ),
-    ],
-  );
-}
+        TextButton(
+          onPressed: () {
+            setState(() {
+              // Deselect all checkboxes
+              for (var contact in recentContacts) {
+                contact['isSelected'] = false;
+              }
+              _isDeleteMode = false; // Exit delete mode
+              _selectAll = false; // Reset select-all state
+            });
+          },
+          child: const Text(
+            'Cancel',
+            style: TextStyle(color: Colors.red),
+          ),
+        ),
+      ],
+    );
+  }
 
+  Widget _buildRecentContactsList() {
+    List<Map<String, dynamic>> filteredContacts = recentContacts.where((contact) {
+      String name = contact['name']?.toLowerCase() ?? '';
+      String number = contact['number'] ?? '';
+      return name.contains(_searchQuery.toLowerCase()) || number.contains(_searchQuery);
+    }).toList();
 
-Widget _buildRecentContactsList() {
-  List<Map<String, dynamic>> filteredContacts = recentContacts.where((contact) {
-    String name = contact['name']?.toLowerCase() ?? '';
-    String number = contact['number'] ?? '';
-    return name.contains(_searchQuery.toLowerCase()) ||
-        number.contains(_searchQuery);
-  }).toList();
+    if (filteredContacts.isEmpty) {
+      return const Expanded(
+        child: Center(
+          child: Text("No contacts found."),
+        ),
+      );
+    }
 
-  if (filteredContacts.isEmpty) {
-    return const Expanded(
-      child: Center(
-        child: Text("No contacts found."),
+    return Expanded(
+      child: ListView.builder(
+        itemCount: filteredContacts.length,
+        itemBuilder: (context, index) {
+          String name = filteredContacts[index]['name'] ?? 'Unknown';
+          String number = filteredContacts[index]['number'] ?? '';
+          String imageUrl = filteredContacts[index]['imageUrl'] ?? '';
+          bool isSelected = filteredContacts[index]['isSelected'] ?? false;
+          String status = filteredContacts[index]['status'];
+
+          return ListTile(
+            leading: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_isDeleteMode)
+                  Checkbox(
+                    value: isSelected,
+                    onChanged: (value) {
+                      setState(() {
+                        filteredContacts[index]['isSelected'] = value ?? false;
+                        _selectAll = filteredContacts
+                            .every((contact) => contact['isSelected']); // Update select-all state
+                      });
+                    },
+                  ),
+                CircleAvatar(
+                  radius: 25,
+                  backgroundImage: imageUrl.isNotEmpty
+                      ? NetworkImage(imageUrl)
+                      : const AssetImage('assets/icon.jpg') as ImageProvider,
+                ),
+              ],
+            ),
+            title: Text(name),
+            subtitle: Text(number),
+            trailing: Icon(
+              status == 'accepted' ? Icons.call_received : Icons.call_made,
+              color: status == 'accepted' ? Colors.green : Colors.blue,
+            ),
+          );
+        },
       ),
     );
   }
 
-  return Expanded(
-    child: ListView.builder(
-      itemCount: filteredContacts.length,
-      itemBuilder: (context, index) {
-        String name = filteredContacts[index]['name'] ?? 'Unknown';
-        String number = filteredContacts[index]['number'] ?? '';
-        String imageUrl = filteredContacts[index]['imageUrl'] ?? '';
-        bool isSelected = filteredContacts[index]['isSelected'] ?? false;
-        String status = filteredContacts[index]['status'];
-
-        return ListTile(
-          leading: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_isDeleteMode)
-                Checkbox(
-                  value: isSelected,
-                  onChanged: (value) {
-                    setState(() {
-                      filteredContacts[index]['isSelected'] = value ?? false;
-                      _selectAll = filteredContacts.every((contact) =>
-                          contact['isSelected']); // Update select-all state
-                    });
-                  },
-                ),
-              CircleAvatar(
-                radius: 25,
-                backgroundImage: imageUrl.isNotEmpty
-                    ? NetworkImage(imageUrl)
-                    : const AssetImage('assets/icon.jpg') as ImageProvider,
-              ),
-            ],
-          ),
-          title: Text(name),
-          subtitle: Text(number),
-          trailing: Icon(
-            status == 'accepted' ? Icons.call_received : Icons.call_made,
-            color: status == 'accepted' ? Colors.green : Colors.blue,
-          ),
-        );
-      },
-    ),
-  );
-}
-
-
-  // Delete selected recent calls from both the UI and Firebase
   Future<void> _deleteSelectedContacts() async {
     if (!recentContacts.any((contact) => contact['isSelected'])) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -274,11 +299,10 @@ Widget _buildRecentContactsList() {
       );
       return;
     }
-    
-      // Show a SnackBar to indicate the deletion process
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Deleting contact(s)...')),
-  );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Deleting contact(s)...')),
+    );
 
     try {
       for (var contact in recentContacts.where((c) => c['isSelected'])) {
@@ -310,7 +334,6 @@ Widget _buildRecentContactsList() {
       items: [
         const PopupMenuItem<String>(value: 'delete', child: Text('Delete')),
         const PopupMenuItem<String>(value: 'profile', child: Text('Profile')),
-        const PopupMenuItem<String>(value: 'translations', child: Text('Translations')),
       ],
       elevation: 8.0,
     ).then((value) {
@@ -332,12 +355,6 @@ Widget _buildRecentContactsList() {
             MaterialPageRoute(builder: (context) => const ProfileScreen()),
           );
           break;
-        // case 'translations':
-        //   Navigator.push(
-        //     context,
-        //     // MaterialPageRoute(builder: (context) => const TranslationsScreen()),
-        //   );
-        //   break;
       }
     });
   }

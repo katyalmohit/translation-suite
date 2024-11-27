@@ -1,8 +1,7 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../widgets/back_app_bar.dart'; // Import your custom app bar
+import '../widgets/back_app_bar.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({Key? key}) : super(key: key);
@@ -16,17 +15,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _birthdayController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
 
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchUserData(); // Fetch data on screen load
+    _fetchUserData();
   }
 
   Future<void> _fetchUserData() async {
@@ -34,12 +33,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       DocumentSnapshot doc = await _firestore.collection('users').doc(user?.uid).get();
       if (doc.exists) {
         var userData = doc.data() as Map<String, dynamic>;
+        var userDetails = userData['user_details'] ?? {};
         setState(() {
-          _nameController.text = userData['userName'] ?? '';
-          _phoneController.text = userData['phoneNumber'] ?? '';
-          _birthdayController.text = userData['birthday'] ?? '';
-          _locationController.text = userData['location'] ?? '';
-          _emailController.text = userData['email'] ?? '';
+          _nameController.text = userDetails['userName'] ?? '';
+          _birthdayController.text = userDetails['birthday'] ?? '';
+          _locationController.text = userDetails['location'] ?? '';
+          _emailController.text = userDetails['email'] ?? '';
+          _phoneController.text = userDetails['phoneNumber'] ?? '';
         });
       }
     } catch (e) {
@@ -50,8 +50,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-   // Validation functions
-  String? _validateuserName(String userName) {
+  String? _validateUserName(String userName) {
     if (userName.isEmpty) return "User Name cannot be empty.";
     if (RegExp(r'^\d+$').hasMatch(userName)) {
       return "User Name cannot be entirely numbers.";
@@ -84,12 +83,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return null;
   }
 
-Future<void> _saveProfile() async {
-      String userName = _nameController.text.trim();
+  Future<void> _saveProfile() async {
+    String userName = _nameController.text.trim();
     String birthday = _birthdayController.text.trim();
     String location = _locationController.text.trim();
 
-     String? userNameError = _validateuserName(userName);
+    String? userNameError = _validateUserName(userName);
     if (userNameError != null) {
       _showDialog(userNameError);
       return;
@@ -107,36 +106,34 @@ Future<void> _saveProfile() async {
       return;
     }
 
-        setState(() => _isLoading = true);
+    setState(() => _isLoading = true);
 
+    try {
+      // Update user data in Firestore under `user_details`
+      Map<String, dynamic> updatedUserData = {
+        'user_details.userName': userName,
+        'user_details.birthday': birthday,
+        'user_details.location': location,
+        'user_details.email': _emailController.text, // Keep email for display
+        'user_details.phoneNumber': _phoneController.text, // Keep phone for display
+      };
+      await _firestore.collection('users').doc(user?.uid).update(updatedUserData);
 
-  try {
-    // Update user data in Firestore
-    Map<String, dynamic> updatedUserData = {
-      'userName': _nameController.text,
-      'birthday': _birthdayController.text,
-      'location': _locationController.text,
-      'phoneNumber': _phoneController.text,  // Include phone number
-      'email': _emailController.text,        // Include email
-    };
-    await _firestore.collection('users').doc(user?.uid).update(updatedUserData);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated successfully!')),
+      );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile updated successfully!')),
-    );
-
-    // Pass all data back to ProfileScreen
-    Navigator.pop(context, updatedUserData);
-  } catch (e) {
-    print('Failed to update profile: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Failed to update profile.')),
-    );
-  } finally {
-    setState(() => _isLoading = false);
+      // Pass updated data back to ProfileScreen
+      Navigator.pop(context, updatedUserData);
+    } catch (e) {
+      print('Failed to update profile: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update profile.')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
-}
-
 
   void _showDialog(String message) {
     showDialog(
@@ -171,14 +168,14 @@ Future<void> _saveProfile() async {
               const SizedBox(height: 16),
 
               _buildInteractiveTextField(
-                "Email address", _emailController, 
-                "You cannot edit the email address."
+                "Email Address", _emailController,
+                "You cannot edit the email address.",
               ),
               const SizedBox(height: 16),
 
               _buildInteractiveTextField(
-                "Phone number", _phoneController, 
-                "You cannot edit the phone number."
+                "Phone Number", _phoneController,
+                "You cannot edit the phone number.",
               ),
               const SizedBox(height: 16),
 
@@ -228,13 +225,12 @@ Future<void> _saveProfile() async {
     );
   }
 
-  // Build editable text field
   Widget _buildTextField(String label, TextEditingController controller,
       {bool enabled = true}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: const Color.fromARGB(255, 33, 5, 5),
+        color: const Color.fromARGB(255, 33, 33, 33),
         borderRadius: BorderRadius.circular(8),
       ),
       child: TextField(
@@ -250,7 +246,6 @@ Future<void> _saveProfile() async {
     );
   }
 
-  // Build interactive text field with tap functionality
   Widget _buildInteractiveTextField(
       String label, TextEditingController controller, String dialogMessage) {
     return GestureDetector(
@@ -258,10 +253,10 @@ Future<void> _saveProfile() async {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: const Color.fromARGB(255, 33, 5, 5),
+          color: const Color.fromARGB(255, 33, 33, 33),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: AbsorbPointer( // Prevents editing
+        child: AbsorbPointer(
           child: TextField(
             controller: controller,
             enabled: false,
