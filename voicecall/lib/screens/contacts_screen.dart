@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:voicecall/screens/audio_calling_screen.dart';
 import 'package:voicecall/screens/contact_profile_screen.dart';
 import 'package:voicecall/screens/profile_screen.dart';
-import 'package:voicecall/translations/translation_screen.dart';
 import '../widgets/custom_app_bar.dart';
 
 class ContactsScreen extends StatefulWidget {
@@ -43,6 +42,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
         List<dynamic> contacts = userDoc['contacts'] ?? [];
         setState(() {
           _contacts = contacts.map((e) => Map<String, dynamic>.from(e)).toList();
+          for (var contact in _contacts) {
+            contact['isSelected'] = false; // Add selection state
+          }
           _isContactsLoaded = true;
         });
 
@@ -159,7 +161,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Widget _buildContactsList() {
     List<Map<String, dynamic>> filteredContacts = _contacts.where((contact) {
       String name = contact['name'] ?? '';
-      String phone = contact['phoneNumber'] ?? '';
+      String phone = contact['phone'] ?? '';
       return name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           phone.contains(_searchQuery);
     }).toList();
@@ -180,7 +182,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         itemCount: filteredContacts.length,
         itemBuilder: (context, index) {
           String name = filteredContacts[index]['name'] ?? '';
-          String phone = filteredContacts[index]['phoneNumber'] ?? '';
+          String phone = filteredContacts[index]['phone'] ?? '';
           String imageUrl = filteredContacts[index]['imageUrl'] ?? '';
           bool isSelected = filteredContacts[index]['isSelected'] ?? false;
 
@@ -220,61 +222,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
             ),
             title: Text(name),
             subtitle: Text(phone),
-            trailing: IconButton(
-              icon: const Icon(Icons.call, color: Colors.green),
-              onPressed: () async {
-                // Place call using the global `ongoingCalls` collection
-                try {
-                  // Check if the recipient exists
-                  QuerySnapshot userQuery = await FirebaseFirestore.instance
-                      .collection('users')
-                      .where('user_details.phoneNumber', isEqualTo: phone)
-                      .limit(1)
-                      .get();
-
-                  if (userQuery.docs.isNotEmpty) {
-                    String recipientUid = userQuery.docs.first.id;
-                    String currentUserUid = FirebaseAuth.instance.currentUser!.uid;
-
-                    // Create a new call in `ongoingCalls`
-                    String callId = FirebaseFirestore.instance.collection('ongoingCalls').doc().id;
-
-                    await FirebaseFirestore.instance.collection('ongoingCalls').doc(callId).set({
-                      'callerUid': currentUserUid,
-                      'callerPhoneNumber': phone,
-                      'acceptorUid': recipientUid,
-                      'acceptorPhoneNumber': phone,
-                      'callId': callId,
-                      'status': 'placed',
-                      'timestamp': FieldValue.serverTimestamp(),
-                    });
-
-                    // Navigate to the AudioCallingScreen
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AudioCallingScreen(
-                          enteredNumber: phone,
-                          recipientUid: recipientUid,
-                          callId: callId,
-                        ),
-                      ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content:
-                              Text('User with this phone number does not exist.')),
-                    );
-                  }
-                } catch (e) {
-                  print('Error initiating call: $e');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to place the call.')),
-                  );
-                }
-              },
-            ),
           );
         },
       ),
@@ -327,8 +274,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
       items: [
         const PopupMenuItem<String>(value: 'delete', child: Text('Delete')),
         const PopupMenuItem<String>(value: 'profile', child: Text('Profile')),
-        const PopupMenuItem<String>(
-            value: 'translations', child: Text('Translations')),
       ],
       elevation: 8.0,
     ).then((value) {
@@ -350,13 +295,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
             MaterialPageRoute(builder: (context) => const ProfileScreen()),
           );
           break;
-        // case 'translations':
-        //   Navigator.push(
-        //     context,
-        //     MaterialPageRoute(
-        //         builder: (context) => const TranslationsScreen()),
-        //   );
-        //   break;
       }
     });
   }
