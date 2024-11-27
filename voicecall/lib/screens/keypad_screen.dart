@@ -428,12 +428,13 @@ Widget _buildCallAndDeleteButtons() {
           context,
           MaterialPageRoute(builder: (context) => const ProfileScreen()),
         );
-      } else if (value == 'translations') {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const TranslationsScreen()),
-        );
-      }
+      } 
+      // else if (value == 'translations') {
+      //   Navigator.push(
+      //     context,
+      //     MaterialPageRoute(builder: (context) => const TranslationsScreen()),
+      //   );
+      // }
     });
   }
 }

@@ -332,12 +332,12 @@ Widget _buildRecentContactsList() {
             MaterialPageRoute(builder: (context) => const ProfileScreen()),
           );
           break;
-        case 'translations':
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const TranslationsScreen()),
-          );
-          break;
+        // case 'translations':
+        //   Navigator.push(
+        //     context,
+        //     // MaterialPageRoute(builder: (context) => const TranslationsScreen()),
+        //   );
+        //   break;
       }
     });
   }

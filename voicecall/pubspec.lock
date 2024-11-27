@@ -101,26 +101,26 @@ packages:
     dependency: transitive
     description:
       name: cached_network_image
-      sha256: "7c1183e361e5c8b0a0f21a28401eecdbde252441106a9816400dd4c2b2424916"
+      sha256: "28ea9690a8207179c319965c13cd8df184d5ee721ae2ce60f398ced1219cea1f"
       url: "https://pub.dev"
     source: hosted
-    version: "3.4.1"
+    version: "3.3.1"
   cached_network_image_platform_interface:
     dependency: transitive
     description:
       name: cached_network_image_platform_interface
-      sha256: "35814b016e37fbdc91f7ae18c8caf49ba5c88501813f73ce8a07027a395e2829"
+      sha256: "9e90e78ae72caa874a323d78fa6301b3fb8fa7ea76a8f96dc5b5bf79f283bf2f"
       url: "https://pub.dev"
     source: hosted
-    version: "4.1.1"
+    version: "4.0.0"
   cached_network_image_web:
     dependency: transitive
     description:
       name: cached_network_image_web
-      sha256: "980842f4e8e2535b8dbd3d5ca0b1f0ba66bf61d14cc3a17a9b4788a3685ba062"
+      sha256: "205d6a9f1862de34b93184f22b9d2d94586b2f05c581d546695e3d8f6a805cd7"
       url: "https://pub.dev"
     source: hosted
-    version: "1.3.1"
+    version: "1.2.0"
   characters:
     dependency: transitive
     description:
@@ -201,6 +201,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.8"
+  dart_webrtc:
+    dependency: transitive
+    description:
+      name: dart_webrtc
+      sha256: c664ad88d5646735753add421ee2118486c100febef5e92b7f59cdbabf6a51f6
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.4.9"
   dbus:
     dependency: transitive
     description:
@@ -418,10 +426,10 @@ packages:
     dependency: transitive
     description:
       name: flutter_cache_manager
-      sha256: "400b6592f16a4409a7f2bb929a9a7e38c72cceb8ffb99ee57bbf2cb2cecf8386"
+      sha256: "8207f27539deb83732fdda03e259349046a39a4c767269285f449ade355d54ba"
       url: "https://pub.dev"
     source: hosted
-    version: "3.4.1"
+    version: "3.3.1"
   flutter_callkit_incoming_yoer:
     dependency: transitive
     description:
@@ -480,6 +488,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_webrtc:
+    dependency: "direct main"
+    description:
+      name: flutter_webrtc
+      sha256: fcaee6f28cc1221e804fcba16fbee6f20b0848af20fe11174a0f97c3b9833381
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.12.2"
   font_awesome_flutter:
     dependency: "direct main"
     description:
@@ -488,14 +504,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "10.7.0"
-  google_fonts:
-    dependency: "direct main"
-    description:
-      name: google_fonts
-      sha256: b1ac0fe2832c9cc95e5e88b57d627c5e68c223b9657f4b96e1487aa9098c7b82
-      url: "https://pub.dev"
-    source: hosted
-    version: "6.2.1"
   google_identity_services_web:
     dependency: transitive
     description:
@@ -548,10 +556,10 @@ packages:
     dependency: "direct main"
     description:
       name: http
-      sha256: b9c29a161230ee03d3ccf545097fccd9b87a5264228c5d348202e0f0c28f9010
+      sha256: "5895291c13fa8a3bd82e76d5627f69e0d85ca6a30dcac95c4ea19a5d555879c2"
       url: "https://pub.dev"
     source: hosted
-    version: "1.2.2"
+    version: "0.13.6"
   http_parser:
     dependency: transitive
     description:
@@ -672,6 +680,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.0.0"
+  logging:
+    dependency: transitive
+    description:
+      name: logging
+      sha256: c8245ada5f1717ed44271ed1c26b8ce85ca3228fd2ffdb75468ab01979309d61
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.3.0"
   matcher:
     dependency: transitive
     description:
@@ -696,6 +712,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.15.0"
+  mic_stream:
+    dependency: "direct main"
+    description:
+      name: mic_stream
+      sha256: "1db1ec77bdd8ffc0d1c5cc606398612930312a96462220add5ea24aa9da73210"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.7.1+2"
+  microsoft_azure_translator:
+    dependency: "direct main"
+    description:
+      name: microsoft_azure_translator
+      sha256: cdf076e4d2c315ced59fc9157e4f05d5b2c42fa564d7f19309729cd3d0d85b4d
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.2"
   mime:
     dependency: transitive
     description:
@@ -864,6 +896,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.5"
+  platform_detect:
+    dependency: transitive
+    description:
+      name: platform_detect
+      sha256: a62f99417fc4fa2d099ce0ccdbb1bd3977920f2a64292c326271f049d4bc3a4f
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.0"
   plugin_platform_interface:
     dependency: transitive
     description:
@@ -880,14 +920,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.9.1"
+  pub_semver:
+    dependency: transitive
+    description:
+      name: pub_semver
+      sha256: "40d3ab1bbd474c4c2328c91e3a7df8c6dd629b79ece4c4bd04bee496a224fb0c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.4"
   rxdart:
     dependency: transitive
     description:
       name: rxdart
-      sha256: "5c3004a4a8dbb94bd4bf5412a4def4acdaa12e12f269737a5751369e12d1a962"
+      sha256: "0c7c0cedd93788d996e33041ffecda924cc54389199cde4e6a34b440f50044cb"
       url: "https://pub.dev"
     source: hosted
-    version: "0.28.0"
+    version: "0.27.7"
   shared_preferences:
     dependency: transitive
     description:
@@ -949,6 +997,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.99"
+  sound_stream:
+    dependency: "direct main"
+    description:
+      name: sound_stream
+      sha256: "66e68cc6be9423c6ebbe40bcf177c61ae6b75fce8189c51fbf9db7f54d4ef23d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.1"
   source_span:
     dependency: transitive
     description:
@@ -1077,14 +1133,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.2"
-  translator:
-    dependency: "direct main"
-    description:
-      name: translator
-      sha256: "8f5e56d0ffb8f493b23ad0e4f824c17e5f43d45997e33b7c7b689c7a33cf3b06"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.3+1"
   typed_data:
     dependency: transitive
     description:
@@ -1237,6 +1285,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.0"
+  webrtc_interface:
+    dependency: transitive
+    description:
+      name: webrtc_interface
+      sha256: abec3ab7956bd5ac539cf34a42fa0c82ea26675847c0966bb85160400eea9388
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.0"
   win32:
     dependency: transitive
     description:
@@ -1297,10 +1353,10 @@ packages:
     dependency: transitive
     description:
       name: zego_uikit
-      sha256: "0a7829ef7c22a8dbf24ccc52f9cda77d3a29313ae4dedfc40b3c987a249638f3"
+      sha256: "15a90c2929891517bcc6108af6a882e3564b6ff0cfebadf1ef2b0a3cb4b8b7e9"
       url: "https://pub.dev"
     source: hosted
-    version: "2.27.16"
+    version: "2.28.0-beta.2"
   zego_uikit_prebuilt_call:
     dependency: "direct main"
     description:

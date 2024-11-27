@@ -34,7 +34,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .get();
       if (snapshot.exists) {
         setState(() {
-          userData = snapshot.data() as Map<String, dynamic>;
+          userData = snapshot.get('user_details') as Map<String, dynamic>;
         });
       }
     } catch (e) {
@@ -61,7 +61,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    // Show a persistent SnackBar with a loading message
     final snackBar = SnackBar(
       content: Row(
         children: [
@@ -70,7 +69,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Expanded(child: Text('Uploading profile picture...')),
         ],
       ),
-      duration: const Duration(days: 1), // Keep it visible until dismissed
+      duration: const Duration(days: 1),
     );
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
@@ -84,12 +83,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       UploadTask uploadTask = ref.putFile(_image!);
       await uploadTask;
 
-      // Get the download URL
       String downloadURL = await ref.getDownloadURL();
 
-      // Save the download URL to Firestore
+      // Save the download URL to Firestore under 'user_details'
       await FirebaseFirestore.instance.collection('users').doc(user?.uid).update({
-        'profileImage': downloadURL,
+        'user_details.profileImage': downloadURL,
       });
 
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -98,7 +96,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
       setState(() {
-        userData?['profileImage'] = downloadURL; // Update the image on screen
+        userData?['profileImage'] = downloadURL;
       });
     } catch (e) {
       print("Error during upload: $e");
@@ -126,7 +124,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Profile picture and edit button
             Stack(
               alignment: Alignment.center,
               children: [
@@ -147,17 +144,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.add, color: Colors.white),
-                      onPressed: _pickImage, // Handle image upload
+                      onPressed: _pickImage,
                     ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 20),
-
-            // User details
             Text(
-              userData!['userName'] ?? 'N/A',
+              userData!['username'] ?? 'N/A',
               style: const TextStyle(
                   fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black),
             ),
@@ -167,15 +162,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: const TextStyle(fontSize: 18, color: Colors.grey),
             ),
             const SizedBox(height: 20),
-
-            // Location, Email, Birthday
             _buildDetailRow("LOCATION :", userData!['location'] ?? 'N/A'),
             _buildDetailRow("EMAIL :", userData!['email'] ?? 'N/A'),
             _buildDetailRow("BIRTHDAY :", userData!['birthday'] ?? 'N/A'),
-
             const SizedBox(height: 30),
-
-            // Edit and Logout buttons side by side
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -203,7 +193,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: const Text("EDIT"),
                 ),
                 ElevatedButton(
-                  onPressed: () => _logout(context), // Logout function call
+                  onPressed: () => _logout(context),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
@@ -222,7 +212,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Widget to display user details in a row
   Widget _buildDetailRow(String title, String value) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -241,7 +230,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Logout function
   void _logout(BuildContext context) async {
     try {
       await FirebaseAuth.instance.signOut();
