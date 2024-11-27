@@ -86,7 +86,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       String downloadURL = await ref.getDownloadURL();
 
       // Save the download URL to Firestore under 'user_details'
-      await FirebaseFirestore.instance.collection('users').doc(user?.uid).update({
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user?.uid)
+          .update({
         'user_details.profileImage': downloadURL,
       });
 
@@ -152,9 +155,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              userData!['userName'] ?? 'N/A',
+              userData!['username'] ?? 'N/A',
               style: const TextStyle(
-                  fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black),
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black),
             ),
             const SizedBox(height: 8),
             Text(
@@ -170,33 +175,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 ElevatedButton(
-                  onPressed: () async {
-                    final updatedData = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const EditProfileScreen()),
-                    );
-                    if (updatedData != null && mounted) {
-                      setState(() {
-                        userData?.addAll(updatedData as Map<String, dynamic>);
-                      });
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color.fromARGB(191, 246, 21, 5),
-                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    textStyle: const TextStyle(fontSize: 18),
-                  ),
-                  child: const Text("EDIT"),
-                ),
+  onPressed: () async {
+    // Navigate to EditProfileScreen and wait for updated data
+    final updatedData = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+    );
+
+    // Check if data is returned and update the state
+    if (updatedData != null && mounted) {
+      setState(() {
+        userData?.addAll(updatedData as Map<String, dynamic>);
+      });
+    }
+  },
+  style: ElevatedButton.styleFrom(
+    backgroundColor: const Color.fromARGB(191, 246, 21, 5),
+    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(30),
+    ),
+    textStyle: const TextStyle(fontSize: 18),
+  ),
+  child: const Text("EDIT"),
+),
+
                 ElevatedButton(
                   onPressed: () => _logout(context),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
-                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 40, vertical: 15),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
@@ -223,7 +232,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(title,
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           Text(value, style: const TextStyle(color: Colors.blue, fontSize: 16)),
         ],
       ),

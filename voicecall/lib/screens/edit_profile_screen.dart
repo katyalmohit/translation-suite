@@ -10,6 +10,7 @@ class EditProfileScreen extends StatefulWidget {
   State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
+
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final User? user = FirebaseAuth.instance.currentUser;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -35,7 +36,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         var userData = doc.data() as Map<String, dynamic>;
         var userDetails = userData['user_details'] ?? {};
         setState(() {
-          _nameController.text = userDetails['userName'] ?? '';
+          _nameController.text = userDetails['username'] ?? '';
           _birthdayController.text = userDetails['birthday'] ?? '';
           _locationController.text = userDetails['location'] ?? '';
           _emailController.text = userDetails['email'] ?? '';
@@ -83,57 +84,66 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return null;
   }
 
+ 
   Future<void> _saveProfile() async {
-    String userName = _nameController.text.trim();
-    String birthday = _birthdayController.text.trim();
-    String location = _locationController.text.trim();
+  String userName = _nameController.text.trim();
+  String birthday = _birthdayController.text.trim();
+  String location = _locationController.text.trim();
 
-    String? userNameError = _validateUserName(userName);
-    if (userNameError != null) {
-      _showDialog(userNameError);
-      return;
-    }
+  String? userNameError = _validateUserName(userName);
+  if (userNameError != null) {
+    _showDialog(userNameError);
+    return;
+  }
 
-    String? birthdayError = _validateBirthday(birthday);
-    if (birthdayError != null) {
-      _showDialog(birthdayError);
-      return;
-    }
+  String? birthdayError = _validateBirthday(birthday);
+  if (birthdayError != null) {
+    _showDialog(birthdayError);
+    return;
+  }
 
-    String? locationError = _validateLocation(location);
-    if (locationError != null) {
-      _showDialog(locationError);
-      return;
-    }
+  String? locationError = _validateLocation(location);
+  if (locationError != null) {
+    _showDialog(locationError);
+    return;
+  }
 
-    setState(() => _isLoading = true);
+  setState(() => _isLoading = true);
 
-    try {
-      // Update user data in Firestore under `user_details`
-      Map<String, dynamic> updatedUserData = {
-        'user_details.userName': userName,
-        'user_details.birthday': birthday,
-        'user_details.location': location,
-        'user_details.email': _emailController.text, // Keep email for display
-        'user_details.phoneNumber': _phoneController.text, // Keep phone for display
-      };
-      await _firestore.collection('users').doc(user?.uid).update(updatedUserData);
+  try {
+    DocumentSnapshot userDoc = await _firestore.collection('users').doc(user?.uid).get();
+
+    if (userDoc.exists) {
+      // Fetch existing user_details and modify specific fields
+      Map<String, dynamic> userDetails = userDoc['user_details'] ?? {};
+      userDetails['username'] = userName;
+      userDetails['birthday'] = birthday;
+      userDetails['location'] = location;
+      userDetails['email'] = _emailController.text;
+      userDetails['phoneNumber'] = _phoneController.text;
+
+      // Write the entire updated user_details object back to Firestore
+      await _firestore.collection('users').doc(user?.uid).update({
+        'user_details': userDetails,
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile updated successfully!')),
       );
 
       // Pass updated data back to ProfileScreen
-      Navigator.pop(context, updatedUserData);
-    } catch (e) {
-      print('Failed to update profile: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update profile.')),
-      );
-    } finally {
-      setState(() => _isLoading = false);
+      Navigator.pop(context, userDetails);
     }
+  } catch (e) {
+    print('Failed to update profile: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Failed to update profile.')),
+    );
+  } finally {
+    setState(() => _isLoading = false);
   }
+}
+
 
   void _showDialog(String message) {
     showDialog(
