@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../widgets/back_app_bar.dart'; // Import custom app bar
+import '../widgets/back_app_bar.dart';
 
 class NewContactScreen extends StatefulWidget {
   final String phoneNumber;
@@ -72,101 +72,104 @@ class _NewContactScreenState extends State<NewContactScreen> {
     setState(() {}); // Refresh UI with selected image
   }
 
-Future<void> _saveContact() async {
-  String name = _nameController.text.trim();
-  String phone = _phoneController.text.trim();
-  String email = _emailController.text.trim();
-  String location = _locationController.text.trim();
+  Future<void> _saveContact() async {
+    String name = _nameController.text.trim();
+    String phone = _phoneController.text.trim();
+    String email = _emailController.text.trim();
+    String location = _locationController.text.trim();
 
-  // Validate fields sequentially
-  String? nameError = _validateName(name);
-  if (nameError != null) {
-    _showErrorDialog(nameError);
-    return;
-  }
-
-  String? phoneError = _validatePhoneNumber(phone);
-  if (phoneError != null) {
-    _showErrorDialog(phoneError);
-    return;
-  }
-
-  String? emailError = _validateEmail(email);
-  if (emailError != null) {
-    _showErrorDialog(emailError);
-    return;
-  }
-
-  String? locationError = _validateLocation(location);
-  if (locationError != null) {
-    _showErrorDialog(locationError);
-    return;
-  }
-
-  setState(() => _isSaving = true); // Start saving
-
-  // Show loading dialog
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (BuildContext context) {
-      return const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 20),
-            Expanded(child: Text("Saving contact...")),
-          ],
-        ),
-      );
-    },
-  );
-
-  try {
-    String userId = _currentUser?.uid ?? '';
-    String? imageUrl;
-
-    // If an image is selected, upload it to Firebase Storage
-    if (_image != null) {
-      final ref = FirebaseStorage.instance.ref().child(
-          'contacts/$userId/${DateTime.now().millisecondsSinceEpoch}.jpg');
-      await ref.putFile(File(_image!.path));
-      imageUrl = await ref.getDownloadURL();
+    // Validate fields sequentially
+    String? nameError = _validateName(name);
+    if (nameError != null) {
+      _showErrorDialog(nameError);
+      return;
     }
 
-    // Prepare new contact data
-    Map<String, dynamic> newContact = {
-      'name': name,
-      'phone': phone,
-      'email': email.isNotEmpty ? email : null,
-      'location': location.isNotEmpty ? location : null,
-      'imageUrl': imageUrl,
-      'createdAt': DateTime.now().toIso8601String(), // Use explicit timestamp
-    };
+    String? phoneError = _validatePhoneNumber(phone);
+    if (phoneError != null) {
+      _showErrorDialog(phoneError);
+      return;
+    }
 
-    // Update the `contacts` field in the user's Firestore document
-    DocumentReference userDoc = _firestore.collection('users').doc(userId);
-    await userDoc.update({
-      'contacts': FieldValue.arrayUnion([newContact]),
-    });
+    String? emailError = _validateEmail(email);
+    if (emailError != null) {
+      _showErrorDialog(emailError);
+      return;
+    }
 
-    Navigator.pop(context); // Close loading dialog
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Contact saved successfully!')),
+    String? locationError = _validateLocation(location);
+    if (locationError != null) {
+      _showErrorDialog(locationError);
+      return;
+    }
+
+    setState(() => _isSaving = true); // Start saving
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Expanded(child: Text("Saving contact...")),
+            ],
+          ),
+        );
+      },
     );
 
-    Navigator.pop(context); // Go back to the previous screen
-  } catch (e) {
-    Navigator.pop(context); // Close loading dialog
-    print('Failed to save contact: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Failed to save contact.')),
-    );
-  } finally {
-    setState(() => _isSaving = false); // Stop saving
+    try {
+      String userId = _currentUser?.uid ?? '';
+      String? imageUrl;
+
+      // If an image is selected, upload it to Firebase Storage
+      if (_image != null) {
+        final ref = FirebaseStorage.instance.ref().child(
+            'contacts/$userId/${DateTime.now().millisecondsSinceEpoch}.jpg');
+        await ref.putFile(File(_image!.path));
+        imageUrl = await ref.getDownloadURL();
+      }
+
+      // Generate a unique contact ID
+      String contactId = _firestore.collection('users').doc().id;
+
+      // Prepare new contact data
+      Map<String, dynamic> newContact = {
+        'contactId': contactId, // Unique identifier for this contact
+        'name': name,
+        'phone': phone,
+        'email': email.isNotEmpty ? email : null,
+        'location': location.isNotEmpty ? location : null,
+        'imageUrl': imageUrl,
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+
+      // Update the `contacts` list in the user's document
+      DocumentReference userDoc = _firestore.collection('users').doc(userId);
+      await userDoc.update({
+        'contacts': FieldValue.arrayUnion([newContact]),
+      });
+
+      Navigator.pop(context); // Close loading dialog
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Contact saved successfully!')),
+      );
+
+      Navigator.pop(context); // Go back to the previous screen
+    } catch (e) {
+      Navigator.pop(context); // Close loading dialog
+      print('Failed to save contact: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to save contact.')),
+      );
+    } finally {
+      setState(() => _isSaving = false); // Stop saving
+    }
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
