@@ -44,39 +44,33 @@ class _RecentScreenState extends State<RecentScreen> {
         return;
       }
 
-      // Fetch recent calls from the user's callLogs
-      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final ongoingCallsSnapshot = await _firestore.collection('ongoingCalls').get();
 
-      if (!userDoc.exists) {
-        setState(() {
-          _isLoading = false;
-        });
-        return;
+      for (var doc in ongoingCallsSnapshot.docs) {
+        Map<String, dynamic> callData = doc.data();
+        await _logCallForUsers(callData); // Log calls for both users
       }
 
-      var userData = userDoc.data() as Map<String, dynamic>;
-      List<dynamic> callLogs = userData['callLogs'] ?? [];
+      // Fetch recent calls for the current user
+      final recentCallsSnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .get();
 
       List<Map<String, dynamic>> fetchedRecentContacts = [];
+      if (recentCallsSnapshot.exists) {
+        var userData = recentCallsSnapshot.data() as Map<String, dynamic>;
+        List<dynamic> callLogs = userData['callLogs'] ?? [];
 
-      for (var callLog in callLogs) {
-        String dialedNumber = callLog['phoneNumber'] ?? 'Unknown';
-
-        // Check if the dialed number exists in the user's contacts
-        var contact = (userData['contacts'] ?? []).firstWhere(
-          (contact) => contact['phone'] == dialedNumber,
-          orElse: () => null,
-        );
-
-        String name = contact != null ? contact['name'] ?? 'Unknown' : 'Unknown';
-
-        fetchedRecentContacts.add({
-          'name': name,
-          'number': dialedNumber,
-          'status': callLog['status'] ?? 'Unknown',
-          'timestamp': callLog['timestamp'] ?? '',
-          'isSelected': false,
-        });
+        for (var callLog in callLogs) {
+          fetchedRecentContacts.add({
+            'name': callLog['name'] ?? 'Unknown',
+            'number': callLog['phoneNumber'] ?? 'Unknown',
+            'status': callLog['status'] ?? 'Unknown',
+            'timestamp': callLog['timestamp'] ?? '',
+            'isSelected': false,
+          });
+        }
       }
 
       setState(() {
@@ -91,6 +85,44 @@ class _RecentScreenState extends State<RecentScreen> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _logCallForUsers(Map<String, dynamic> callData) async {
+    try {
+      String callerUid = callData['callerUid'] ?? '';
+      String acceptorUid = callData['acceptorUid'] ?? '';
+      String callerPhoneNumber = callData['callerPhoneNumber'] ?? '';
+      String acceptorPhoneNumber = callData['acceptorPhoneNumber'] ?? '';
+      String status = callData['status'] ?? 'Unknown';
+      Timestamp timestamp = callData['timestamp'] ?? Timestamp.now();
+
+      // Prepare call log for both users
+      Map<String, dynamic> callerLog = {
+        'name': 'You',
+        'phoneNumber': acceptorPhoneNumber,
+        'status': status,
+        'timestamp': timestamp,
+      };
+
+      Map<String, dynamic> acceptorLog = {
+        'name': 'Caller',
+        'phoneNumber': callerPhoneNumber,
+        'status': status,
+        'timestamp': timestamp,
+      };
+
+      // Update caller's call logs
+      await _firestore.collection('users').doc(callerUid).update({
+        'callLogs': FieldValue.arrayUnion([callerLog]),
+      });
+
+      // Update acceptor's call logs
+      await _firestore.collection('users').doc(acceptorUid).update({
+        'callLogs': FieldValue.arrayUnion([acceptorLog]),
+      });
+    } catch (e) {
+      print('Error logging call for users: $e');
     }
   }
 
@@ -198,7 +230,7 @@ class _RecentScreenState extends State<RecentScreen> {
   Widget _buildRecentContactsList() {
     List<Map<String, dynamic>> filteredContacts = recentContacts.where((contact) {
       String name = contact['name']?.toLowerCase() ?? '';
-      String number = contact['number'] ?? '';
+      String number = contact['phoneNumber'] ?? '';
       return name.contains(_searchQuery.toLowerCase()) || number.contains(_searchQuery);
     }).toList();
 
@@ -215,7 +247,7 @@ class _RecentScreenState extends State<RecentScreen> {
         itemCount: filteredContacts.length,
         itemBuilder: (context, index) {
           String name = filteredContacts[index]['name'] ?? 'Unknown';
-          String number = filteredContacts[index]['number'] ?? '';
+          String number = filteredContacts[index]['phoneNumber'] ?? '';
           String status = filteredContacts[index]['status'];
           Timestamp timestamp = filteredContacts[index]['timestamp'];
 
